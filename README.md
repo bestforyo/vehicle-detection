@@ -19,23 +19,23 @@ npm.cmd run dev
 
 构建校验：`npm.cmd run build`
 
-### 本地 API（需 Node.js 22、npm 和 Docker Compose）
+### 本地 API（需 Node.js 22、npm 和 PostgreSQL 16+）
 
-在 PowerShell 中从仓库根目录执行：
+确保本机 PostgreSQL 服务正在运行，并通过 pgAdmin 创建本地数据库 `jianjian`（所有者可用本机开发账号）。在 PowerShell 中从仓库根目录复制 API 环境模板：
 
 ```powershell
-Copy-Item .env.example apps/api/.env
+Copy-Item apps/api/.env.example apps/api/.env
 ```
 
-编辑 `apps/api/.env`：将数据库地址中的主机 `postgres` 改为 `localhost`，并将对象存储地址改为 `http://localhost:9000`。替换所有示例密钥；本地配置不要复用到生产。
+在本机编辑 `apps/api/.env`，只在此文件中填写 PostgreSQL 用户密码（不要发送到聊天或提交仓库）。密码需要按 URL 编码后填入 `DATABASE_URL`；例如 `@` 写为 `%40`，`#` 写为 `%23`。环境模板中的 JWT/HMAC/加密密钥仅限本地开发，绝不能用于生产。当前本地开发不要求 Redis、Docker 或对象存储；没有配置 S3 时，照片上传功能不可用。
 
 ```powershell
-docker compose --profile local-storage up -d postgres minio
-docker compose --profile local-storage run --rm minio-init
 npm.cmd ci
 npm.cmd run db:migrate:deploy
 npm.cmd run start:dev --workspace @jianjian/api
 ```
+
+如果数据库由管理员账号创建，`DATABASE_URL` 中应使用该数据库的所有者账号。请勿在生产环境使用 PostgreSQL 超级用户运行 API。
 
 健康检查：`http://localhost:3001/health/ready`。开发环境 Swagger：`http://localhost:3001/api/docs`。现有 `npm.cmd run dev` 仍启动未接 API 的原型前端。
 
