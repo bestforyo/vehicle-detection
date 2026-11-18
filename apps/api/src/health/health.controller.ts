@@ -1,0 +1,23 @@
+import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
+import { PrismaService } from "../database/prisma.service";
+
+@Controller("health")
+export class HealthController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get("live")
+  live() {
+    return { status: "ok" };
+  }
+
+  @Get("ready")
+  async ready() {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return { status: "ok", database: "connected" };
+    } catch (error) {
+      console.error("API readiness check failed.", error);
+      throw new ServiceUnavailableException("服务暂不可用。");
+    }
+  }
+}

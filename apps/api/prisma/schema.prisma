@@ -1,0 +1,431 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum PlatformRole {
+  NONE
+  OPERATOR
+  SUPER_ADMIN
+}
+
+enum MembershipRole {
+  INSPECTOR
+  ORG_ADMIN
+}
+
+enum OrderStatus {
+  PENDING_INSPECTION
+  INSPECTING
+  REVIEW_PENDING
+  NEEDS_MODIFICATION
+  PUBLISHED
+  CANCELLED
+}
+
+enum InspectionRevisionStatus {
+  DRAFT
+  SUBMITTED
+  RETURNED
+  APPROVED
+}
+
+enum ReviewDecision {
+  APPROVED
+  RETURNED
+}
+
+enum ReportStatus {
+  PUBLISHED
+  REVOKED
+}
+
+enum ShareStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum MediaScanStatus {
+  PENDING
+  CLEAN
+  REJECTED
+}
+
+model Tenant {
+  id              String               @id @default(uuid()) @db.Uuid
+  code            String               @unique
+  name            String
+  status          TenantStatus         @default(ACTIVE)
+  settings        Json                 @default("{}")
+  memberships     TenantMembership[]
+  invitations     TenantInvitation[]
+  templates       InspectionTemplate[]
+  vehicles        Vehicle[]
+  orders          InspectionOrder[]
+  revisions       InspectionRevision[]
+  reports         Report[]
+  shares          ReportShare[]
+  media           MediaAsset[]
+  auditEvents     AuditEvent[]
+  idempotencyKeys IdempotencyKey[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+}
+
+model User {
+  id           String             @id @default(uuid()) @db.Uuid
+  displayName  String
+  email        String?            @unique
+  passwordHash String?
+  platformRole PlatformRole       @default(NONE)
+  status       UserStatus         @default(ACTIVE)
+  memberships  TenantMembership[]
+  identities   UserIdentity[]
+  sessions     Session[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model UserIdentity {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  provider    String
+  subjectHash String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([provider, subjectHash])
+  @@index([userId])
+}
+
+model TenantMembership {
+  id        String            @id @default(uuid()) @db.Uuid
+  tenantId  String            @db.Uuid
+  userId    String            @db.Uuid
+  role      MembershipRole
+  status    UserStatus        @default(ACTIVE)
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sessions  Session[]
+  assigned  InspectionOrder[] @relation("AssignedInspector")
+  createdAt DateTime          @default(now())
+
+  @@unique([tenantId, userId])
+  @@unique([tenantId, id])
+  @@index([userId, status])
+}
+
+model TenantInvitation {
+  id         String         @id @default(uuid()) @db.Uuid
+  tenantId   String         @db.Uuid
+  email      String?
+  role       MembershipRole
+  tokenHash  String         @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  invitedBy  String         @db.Uuid
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdAt  DateTime       @default(now())
+
+  @@index([tenantId, acceptedAt, expiresAt])
+}
+
+model Session {
+  id                    String            @id @default(uuid()) @db.Uuid
+  userId                String            @db.Uuid
+  tenantId              String?           @db.Uuid
+  membershipId          String?           @db.Uuid
+  refreshHash           String            @unique
+  previousRefreshHashes String[]          @default([])
+  refreshFamily         String            @db.Uuid
+  expiresAt             DateTime
+  revokedAt             DateTime?
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membership            TenantMembership? @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  createdAt             DateTime          @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([refreshFamily, revokedAt])
+}
+
+model Standard {
+  id        String             @id @default(uuid()) @db.Uuid
+  code      String             @unique
+  title     String
+  owner     String?
+  revisions StandardRevision[]
+}
+
+model StandardRevision {
+  id                String               @id @default(uuid()) @db.Uuid
+  standardId        String               @db.Uuid
+  version           String
+  sourceHash        String?
+  approvalRef       String?
+  approvedAt        DateTime?
+  standard          Standard             @relation(fields: [standardId], references: [id], onDelete: Restrict)
+  templates         InspectionTemplate[]
+  templateRevisions TemplateRevision[]
+
+  @@unique([standardId, version])
+}
+
+model InspectionTemplate {
+  id                 String             @id @default(uuid()) @db.Uuid
+  tenantId           String             @db.Uuid
+  code               String
+  title              String
+  vehicleKind        String
+  usage              String
+  standardType       String
+  standardRevisionId String?            @db.Uuid
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  standardRevision   StandardRevision?  @relation(fields: [standardRevisionId], references: [id], onDelete: Restrict)
+  revisions          TemplateRevision[]
+  orders             InspectionOrder[]
+  createdAt          DateTime           @default(now())
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, id])
+  @@index([tenantId, vehicleKind, usage])
+}
+
+model TemplateRevision {
+  id                 String             @id @default(uuid()) @db.Uuid
+  tenantId           String             @db.Uuid
+  templateId         String             @db.Uuid
+  revisionNumber     Int
+  schema             Json
+  approvalRef        String?
+  approvedAt         DateTime?
+  publishedAt        DateTime?
+  publishedBy        String?            @db.Uuid
+  standardRevision   StandardRevision?  @relation(fields: [standardRevisionId], references: [id], onDelete: Restrict)
+  standardRevisionId String?            @db.Uuid
+  template           InspectionTemplate @relation(fields: [tenantId, templateId], references: [tenantId, id], onDelete: Restrict)
+  orders             InspectionOrder[]
+  createdAt          DateTime           @default(now())
+
+  @@unique([templateId, revisionNumber])
+  @@unique([tenantId, id])
+  @@index([tenantId, publishedAt])
+}
+
+model Vehicle {
+  id                String            @id @default(uuid()) @db.Uuid
+  tenantId          String            @db.Uuid
+  kind              String
+  brand             String?
+  model             String?
+  year              Int?
+  plateCipher       String?
+  vinCipher         String?
+  mileage           Int?
+  firstRegisteredAt DateTime?
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  orders            InspectionOrder[]
+  createdAt         DateTime          @default(now())
+
+  @@unique([tenantId, id])
+  @@index([tenantId, createdAt])
+}
+
+model InspectionOrder {
+  id                 String               @id @default(uuid()) @db.Uuid
+  tenantId           String               @db.Uuid
+  orderNo            String
+  vehicleId          String               @db.Uuid
+  templateId         String               @db.Uuid
+  templateRevisionId String               @db.Uuid
+  inspectorId        String               @db.Uuid
+  status             OrderStatus          @default(INSPECTING)
+  currentRevisionId  String?              @db.Uuid
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  vehicle            Vehicle              @relation(fields: [tenantId, vehicleId], references: [tenantId, id], onDelete: Restrict)
+  template           InspectionTemplate   @relation(fields: [tenantId, templateId], references: [tenantId, id], onDelete: Restrict)
+  templateRevision   TemplateRevision     @relation(fields: [tenantId, templateRevisionId], references: [tenantId, id], onDelete: Restrict)
+  inspector          TenantMembership     @relation("AssignedInspector", fields: [tenantId, inspectorId], references: [tenantId, id], onDelete: Restrict)
+  revisions          InspectionRevision[]
+  reports            Report[]
+  media              MediaAsset[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@unique([tenantId, orderNo])
+  @@unique([tenantId, id])
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@index([tenantId, inspectorId, status, createdAt(sort: Desc)])
+}
+
+model InspectionRevision {
+  id                String                   @id @default(uuid()) @db.Uuid
+  tenantId          String                   @db.Uuid
+  orderId           String                   @db.Uuid
+  revisionNumber    Int
+  status            InspectionRevisionStatus @default(DRAFT)
+  schemaSnapshot    Json
+  submittedBy       String?                  @db.Uuid
+  submittedAt       DateTime?
+  basedOnRevisionId String?                  @db.Uuid
+  contentHash       String?
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order             InspectionOrder          @relation(fields: [tenantId, orderId], references: [tenantId, id], onDelete: Restrict)
+  answers           InspectionAnswer[]
+  evidence          InspectionEvidence[]
+  reviews           ReviewRecord[]
+  report            Report?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@unique([orderId, revisionNumber])
+  @@unique([tenantId, id])
+  @@index([tenantId, status, submittedAt])
+}
+
+model InspectionAnswer {
+  id         String             @id @default(uuid()) @db.Uuid
+  tenantId   String             @db.Uuid
+  revisionId String             @db.Uuid
+  itemKey    String
+  answer     Json
+  note       String?
+  revision   InspectionRevision @relation(fields: [tenantId, revisionId], references: [tenantId, id], onDelete: Cascade)
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([revisionId, itemKey])
+  @@index([tenantId, revisionId])
+}
+
+model MediaAsset {
+  id         String               @id @default(uuid()) @db.Uuid
+  tenantId   String               @db.Uuid
+  objectKey  String               @unique
+  previewKey String?
+  mimeType   String
+  sizeBytes  BigInt
+  sha256     String?
+  scanStatus MediaScanStatus      @default(PENDING)
+  createdBy  String               @db.Uuid
+  orderId    String?              @db.Uuid
+  revisionId String?              @db.Uuid
+  itemKey    String?
+  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order      InspectionOrder?     @relation(fields: [tenantId, orderId], references: [tenantId, id], onDelete: Restrict)
+  evidence   InspectionEvidence[]
+  createdAt  DateTime             @default(now())
+
+  @@unique([tenantId, id])
+  @@index([tenantId, orderId, revisionId, itemKey])
+  @@index([tenantId, scanStatus])
+}
+
+model InspectionEvidence {
+  tenantId   String             @db.Uuid
+  revisionId String             @db.Uuid
+  itemKey    String
+  assetId    String             @db.Uuid
+  caption    String?
+  revision   InspectionRevision @relation(fields: [tenantId, revisionId], references: [tenantId, id], onDelete: Cascade)
+  asset      MediaAsset         @relation(fields: [tenantId, assetId], references: [tenantId, id], onDelete: Restrict)
+  createdAt  DateTime           @default(now())
+
+  @@id([revisionId, itemKey, assetId])
+  @@index([tenantId, assetId])
+}
+
+model ReviewRecord {
+  id         String             @id @default(uuid()) @db.Uuid
+  tenantId   String             @db.Uuid
+  orderId    String             @db.Uuid
+  revisionId String             @db.Uuid
+  reviewerId String             @db.Uuid
+  decision   ReviewDecision
+  comment    String?
+  targetKeys String[]           @default([])
+  revision   InspectionRevision @relation(fields: [tenantId, revisionId], references: [tenantId, id], onDelete: Restrict)
+  createdAt  DateTime           @default(now())
+
+  @@index([tenantId, orderId, createdAt])
+}
+
+model Report {
+  id          String             @id @default(uuid()) @db.Uuid
+  tenantId    String             @db.Uuid
+  orderId     String             @db.Uuid
+  revisionId  String             @unique @db.Uuid
+  reportNo    String             @unique
+  status      ReportStatus       @default(PUBLISHED)
+  snapshot    Json
+  publishedBy String             @db.Uuid
+  publishedAt DateTime           @default(now())
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order       InspectionOrder    @relation(fields: [tenantId, orderId], references: [tenantId, id], onDelete: Restrict)
+  revision    InspectionRevision @relation(fields: [tenantId, revisionId], references: [tenantId, id], onDelete: Restrict)
+  shares      ReportShare[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, revisionId])
+  @@index([tenantId, publishedAt(sort: Desc)])
+}
+
+model ReportShare {
+  id        String      @id @default(uuid()) @db.Uuid
+  tenantId  String      @db.Uuid
+  reportId  String      @db.Uuid
+  tokenHash String      @unique
+  status    ShareStatus @default(ACTIVE)
+  scope     Json        @default("{}")
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdBy String      @db.Uuid
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  report    Report      @relation(fields: [tenantId, reportId], references: [tenantId, id], onDelete: Restrict)
+  createdAt DateTime    @default(now())
+
+  @@index([tenantId, reportId, status])
+}
+
+model AuditEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String?  @db.Uuid
+  actorId      String?  @db.Uuid
+  action       String
+  resourceType String
+  resourceId   String?
+  requestId    String?
+  metadata     Json     @default("{}")
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, createdAt(sort: Desc)])
+}
+
+model IdempotencyKey {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  actorId     String   @db.Uuid
+  key         String
+  requestHash String
+  resourceId  String   @db.Uuid
+  expiresAt   DateTime
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, actorId, key])
+  @@index([expiresAt])
+}

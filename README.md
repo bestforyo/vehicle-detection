@@ -1,6 +1,14 @@
 # 鉴见 · 车辆检测工作台
 
-面向车辆检测机构的响应式检测师端原型，覆盖乘用车、摩托车的订单创建、现场检测、机构审核与只读报告分享。首页摩托车检测入口暂时关闭并显示“正在建设中，敬请期待”；已存在的摩托车订单仍可查看和处理。点击乘用车检测后进入独立的订单创建页面：先选国标/团标，再选三非排查、四非排查、整车检测或新车检测；选择后立即创建订单并开始检测。新能源检测入口同样显示“正在建设中，敬请期待”且不可创建。
+车辆检测平台工作区，包含现有 React 检测师端交互原型，以及正在建设中的 NestJS API 和 PostgreSQL 后端。**当前版本尚未达到可供真实机构上线使用的状态**：现有前端仍使用演示数据，尚未接入 API；微信小程序、机构/平台管理界面和公开报告 H5 也尚未交付。不要将其作为生产系统部署或录入真实客户资料。
+
+## 当前后端基础
+
+- NestJS API，按机构租户隔离，包含微信身份/邀请登录、角色校验、模板版本、订单与检测修订、证据媒体、审核发布、报告分享和健康检查模块。
+- Prisma/PostgreSQL 数据模型及初始迁移；平台管理员通过一次性 bootstrap 脚本创建，不包含默认账号或默认密码。
+- 支持私有 S3 兼容对象存储；本地可用 Docker Compose 启动 PostgreSQL 和可选 MinIO。
+- API 有 Jest 单元测试与独立 TypeScript 构建。运行时数据/迁移目前尚未连接真实 PostgreSQL 执行验收。
+- 当前没有生产域名/TLS 反向代理、备份恢复验证、正式标准模板、微信小程序客户端或线上环境配置。
 
 ## 本地运行
 
@@ -10,6 +18,57 @@ npm.cmd run dev
 ```
 
 构建校验：`npm.cmd run build`
+
+### 本地 API（需 Node.js 22、npm 和 Docker Compose）
+
+在 PowerShell 中从仓库根目录执行：
+
+```powershell
+Copy-Item .env.example apps/api/.env
+```
+
+编辑 `apps/api/.env`：将数据库地址中的主机 `postgres` 改为 `localhost`，并将对象存储地址改为 `http://localhost:9000`。替换所有示例密钥；本地配置不要复用到生产。
+
+```powershell
+docker compose --profile local-storage up -d postgres minio
+docker compose --profile local-storage run --rm minio-init
+npm.cmd ci
+npm.cmd run db:migrate:deploy
+npm.cmd run start:dev --workspace @jianjian/api
+```
+
+健康检查：`http://localhost:3001/health/ready`。开发环境 Swagger：`http://localhost:3001/api/docs`。现有 `npm.cmd run dev` 仍启动未接 API 的原型前端。
+
+### Compose 部署基础（不是完整生产发布）
+
+1. 将 `.env.example` 复制为根目录 `.env`。分别生成 JWT 密钥、身份 HMAC 密钥和 32 字节十六进制数据加密密钥；每次执行以下 PowerShell 命令生成一个新密钥，三个密钥必须互不相同：
+
+   ```powershell
+   $bytes = New-Object byte[] 32
+   $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+   $rng.GetBytes($bytes)
+   [Convert]::ToHexString($bytes).ToLowerInvariant()
+   $rng.Dispose()
+   ```
+
+   使用密码管理器生成独立数据库密码和一次性管理员密码；不要使用示例值。`DATABASE_URL` 中的数据库密码需 URL 编码。
+2. 为正式环境设置经备案的微信小程序凭据、HTTPS 公开报告地址、允许的管理端来源，以及私有 S3 兼容对象存储配置。生产不要启用本地 MinIO profile。
+3. 构建并执行已提交的数据库迁移：
+
+   ```powershell
+   docker compose --profile maintenance run --build --rm migrate
+   ```
+
+4. 首次初始化平台管理员前，临时设置 `PLATFORM_BOOTSTRAP_EMAIL`、至少 16 位的随机 `PLATFORM_BOOTSTRAP_PASSWORD` 和 `PLATFORM_BOOTSTRAP_NAME`，然后运行：
+
+   ```powershell
+   docker compose --profile maintenance run --build --rm seed
+   ```
+
+   Seed 会拒绝覆盖已有邮箱账号；成功后从 `.env` 中移除一次性 bootstrap 密码。
+5. 启动 API：`docker compose up -d --build api`。API 只绑定到服务器回环地址；需另行配置受支持的 TLS 反向代理、域名、防火墙与监控。当前仓库不包含这些生产设施、自动备份或恢复流程。
+
+即使 API 部署成功，在客户端接入、模板专业审核、数据库/对象存储恢复演练及安全验收完成前，也不能对外开放真实业务。
 
 ## 原型流程
 
@@ -34,16 +93,17 @@ npm.cmd run dev
 
 车辆信息查询目前只有 UI 占位，没有请求第三方服务。
 
-## 当前边界
+## 原型边界
 
 - 这是前端交互原型，不包含服务端、微信小程序原生工程、机构登录、真实 RBAC、多租户隔离或数据库。示例机构和订单均为虚构数据；新增数据仅保存在当前页面内存中。
 - 分享报告快照只写入当前浏览器的 `localStorage`，因此适合在同一浏览器演示，不是可部署的跨设备公开链接。路由和分享页仅用于演示无登录查看体验。
 - 模板中的项目是用于串联交互的示范项，并非任何标准的完整检查清单或合规判定。正式上线前应按机构授权使用的摩托车规范、GB/T 30323-2013 及乘用车规范逐条核验，导入受版本控制的标准目录，并由专业人员审核项目、判定逻辑和报告用语。
 - SVG 车辆图仅为原型示意；只有检测师实际选择上传的图片才是现场照片。
 
-## 生产化建议
+## 正式上线阻塞项
 
-- 租户、用户、角色、模板、订单、检测版本、照片、报告分别建模，并以服务端强制 `tenant_id` 隔离。机构角色限定为检测师和机构管理员；管理员账号由平台开通，检测师账号由机构管理员管理。所有审核、退回和报告发布接口均须服务端校验机构管理员身份。
-- 检测提交应创建不可变版本；退回修改创建新草稿版本，审核通过发布带审计记录的正式报告版本。公开链接应使用高熵签名令牌，而不是可枚举的订单编号，并支持过期、撤销、访问日志和敏感字段脱敏。
-- 将原图上传至对象存储；服务端生成缩略图与多尺寸 WebP/AVIF，报告首屏优先加载缩略图，较大的原图按需加载。生产报告图片应配合 CDN、缓存策略、分段/断点上传和失败重试。
-- 第三方车辆查询通过服务端适配器调用，避免把密钥放在小程序/浏览器端，并记录来源、授权范围和查询审计。
+- 将当前 React 原型替换/接入真实 API，并交付微信小程序、组织管理端、平台管理端和公开报告 H5；实现真实登录、错误处理、会话管理及端到端业务验收。
+- 依据经授权并由专业人员审核的标准目录创建生产模板。数据库 schema/API 本身不代表任何标准已经审核或可用于专业检测。
+- 在真实 PostgreSQL 上执行迁移、并发与租户隔离测试；落实数据库和私有对象存储备份、恢复演练、监控、告警、日志保留和事件响应。
+- 配置生产密钥、微信小程序域名白名单、HTTPS/TLS 反向代理、防火墙及对象存储最小权限。不要把密码、证书或私钥提交到仓库或聊天中。
+- 完成第三方车辆查询服务接入/授权评估，以及上传内容安全扫描、个人信息保护和报告访问策略评审。

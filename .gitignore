@@ -4,3 +4,9 @@ dist/
 vite.config.js
 vite.config.d.ts
 project.private.config.json
+.env
+.env.*
+!.env.example
+apps/api/dist/
+apps/api/coverage/
+apps/api/src/generated/
