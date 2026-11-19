@@ -2,8 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import AdminApp from "./admin/AdminApp";
-import InspectorApp from "./inspector/InspectorApp";
 import PublicReportApp from "./public-report/PublicReportApp";
+import WorkforceEntryApp from "./workforce/WorkforceEntryApp";
 import "./styles.css";
 
 const pathname = window.location.pathname;
@@ -13,7 +13,7 @@ const RootApp = pathname.startsWith("/admin")
     ? PublicReportApp
     : pathname.startsWith("/prototype")
       ? App
-      : InspectorApp;
+      : WorkforceEntryApp;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

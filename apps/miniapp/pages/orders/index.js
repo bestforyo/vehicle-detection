@@ -16,6 +16,7 @@ Page({
     hasMore: false,
     error: "",
     workspaceName: "",
+    isOrganizationAdmin: false,
   },
 
   onShow() {
@@ -23,7 +24,10 @@ Page({
     const user = app.globalData.user;
     if (user && user.activeWorkspace) {
       const membership = user.memberships.find((item) => item.tenant.id === user.activeWorkspace.tenantId);
-      this.setData({ workspaceName: membership ? membership.tenant.name : "机构工作空间" });
+      this.setData({
+        workspaceName: membership ? membership.tenant.name : "机构工作空间",
+        isOrganizationAdmin: user.activeWorkspace.role === "ORG_ADMIN",
+      });
     }
     this.loadOrders();
   },
@@ -79,6 +83,16 @@ Page({
     wx.navigateTo({ url: "/pages/templates/index" });
   },
 
+  openReviews() {
+    if (getApp().globalData.workspaceRole !== "ORG_ADMIN") return;
+    wx.navigateTo({ url: "/pages/reviews/index" });
+  },
+
+  openOrganization() {
+    if (getApp().globalData.workspaceRole !== "ORG_ADMIN") return;
+    wx.navigateTo({ url: "/pages/organization/index" });
+  },
+
   openOrder(event) {
     wx.navigateTo({ url: `/pages/inspection/index?orderId=${encodeURIComponent(event.currentTarget.dataset.id)}` });
   },
@@ -92,6 +106,7 @@ Page({
     }
     getApp().globalData.user = null;
     getApp().globalData.tenantId = "";
+    getApp().globalData.workspaceRole = "";
     wx.redirectTo({ url: "/pages/login/index" });
   },
 });

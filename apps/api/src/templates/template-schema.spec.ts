@@ -1,6 +1,48 @@
 import { inspectionTemplateSchema } from "./template-schema";
 
 describe("inspectionTemplateSchema", () => {
+  it("preserves the decision classification of critical template items", () => {
+    const result = inspectionTemplateSchema.safeParse({
+      version: 1,
+      sections: [{
+        key: "accident",
+        title: "重大事故检测",
+        items: [{
+          key: "front-rail",
+          title: "前纵梁",
+          options: ["正常", "修复"],
+          decisionType: "关键决定项",
+          thresholdRequiredWhen: ["修复"],
+        }],
+      }],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sections[0].items[0]).toMatchObject({
+        decisionType: "关键决定项",
+        thresholdRequiredWhen: ["修复"],
+      });
+    }
+  });
+
+  it("rejects unknown decision classifications", () => {
+    const result = inspectionTemplateSchema.safeParse({
+      version: 1,
+      sections: [{
+        key: "accident",
+        title: "重大事故检测",
+        items: [{
+          key: "front-rail",
+          title: "前纵梁",
+          decisionType: "重要项目",
+        }],
+      }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("limits the total checklist item count to the draft API limit", () => {
     const schema = {
       version: 1 as const,

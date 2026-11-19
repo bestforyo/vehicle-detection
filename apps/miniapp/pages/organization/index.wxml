@@ -1,0 +1,69 @@
+<view class="page">
+  <view class="heading">
+    <text class="eyebrow">ORGANIZATION · ADMINISTRATION</text>
+    <text class="title">机构与成员管理</text>
+    <text class="muted">管理机构展示资料、检测师成员和有效邀请。</text>
+  </view>
+  <view wx:if="{{unauthorized}}" class="error">此功能仅向机构管理员开放。</view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{loading}}" class="card muted">正在加载机构信息…</view>
+  <block wx:elif="{{!unauthorized}}">
+    <view class="section-title">机构资料</view>
+    <view class="card">
+      <text class="field-label">机构名称</text>
+      <input class="input" maxlength="120" value="{{name}}" bindinput="onNameInput" placeholder="机构法定或登记名称" />
+      <text class="field-label">报告展示名称</text>
+      <input class="input" maxlength="120" value="{{displayName}}" bindinput="onDisplayNameInput" placeholder="显示在检测报告上的机构名称" />
+      <text class="field-label">报告免责声明</text>
+      <textarea class="textarea" maxlength="2000" value="{{reportDisclaimer}}" bindinput="onDisclaimerInput" placeholder="可选：填写需要在本机构检测报告上展示的说明" />
+      <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveProfile">保存机构资料</button>
+    </view>
+
+    <view class="section-title">邀请检测师</view>
+    <view class="card">
+      <text class="muted">邀请有效期为 72 小时。可填写邮箱限制受邀账号；留空则任何获得邀请链接的人都可以接受。创建后请立即通过微信转发。</text>
+      <text class="field-label">受邀邮箱（可选）</text>
+      <input class="input" type="text" maxlength="254" value="{{invitationEmail}}" bindinput="onInvitationEmailInput" placeholder="name@example.com" />
+      <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="createInvitation">创建检测师邀请</button>
+      <view wx:if="{{latestInvitationToken}}" class="invitation-share">
+        <text class="success">邀请链接已创建，请立即分享。出于安全考虑，离开本页后不会再次显示邀请令牌。</text>
+        <button class="share-button" open-type="share">转发邀请给检测师</button>
+      </view>
+    </view>
+
+    <view class="section-title">机构成员（{{members.length}}）</view>
+    <view wx:if="{{!members.length}}" class="card muted">暂无机构成员。</view>
+    <view wx:for="{{members}}" wx:key="id" class="card member-card">
+      <view class="row">
+        <text class="member-name">{{item.user.displayName || "未设置姓名"}}</text>
+        <text class="member-status {{item.status === 'ACTIVE' ? 'active' : 'disabled'}}">{{item.statusLabel}}</text>
+      </view>
+      <text class="small">{{item.roleLabel}} · {{item.user.email || "未绑定邮箱"}}</text>
+      <button wx:if="{{!item.isCurrentUser}}" class="secondary-button" disabled="{{saving}}" data-index="{{index}}" bindtap="toggleMemberStatus">{{item.actionLabel}}</button>
+      <text wx:else class="small current-member">当前登录账号</text>
+    </view>
+
+    <view class="section-title">有效邀请（{{invitations.length}}）</view>
+    <view wx:if="{{!invitations.length}}" class="card muted">暂无有效邀请。</view>
+    <view wx:for="{{invitations}}" wx:key="id" class="card invitation-card">
+      <text class="member-name">{{item.email || "不限制邮箱"}}</text>
+      <text class="small">{{item.roleLabel}} · 有效至 {{item.expiresLabel}}</text>
+      <button class="secondary-button revoke-button" disabled="{{saving}}" data-index="{{index}}" bindtap="revokeInvitation">撤销邀请</button>
+    </view>
+
+    <view class="section-title">机构操作记录</view>
+    <view wx:if="{{auditError}}" class="error">{{auditError}}</view>
+    <view wx:if="{{auditLoading && !auditEvents.length}}" class="card muted">正在加载机构操作记录…</view>
+    <view wx:elif="{{!auditEvents.length && !auditError}}" class="card muted">暂无机构操作记录。</view>
+    <view wx:for="{{auditEvents}}" wx:key="id" class="card audit-card">
+      <view class="row">
+        <text class="member-name">{{item.actionLabel}}</text>
+        <text class="audit-time">{{item.createdLabel}}</text>
+      </view>
+      <text class="small">{{item.actorLabel}} · {{item.resourceType}}</text>
+      <text wx:if="{{item.detailLabel}}" class="small">{{item.detailLabel}}</text>
+    </view>
+    <button wx:if="{{auditHasMore}}" class="secondary-button" loading="{{auditLoadingMore}}" disabled="{{auditLoadingMore}}" bindtap="loadMoreAudit">加载更早记录</button>
+    <button wx:if="{{auditError && !auditEvents.length}}" class="secondary-button" loading="{{auditLoading}}" disabled="{{auditLoading}}" bindtap="retryAudit">重试加载记录</button>
+  </block>
+</view>

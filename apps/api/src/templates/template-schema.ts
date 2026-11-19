@@ -5,6 +5,7 @@ const itemSchema = z.object({
   title: z.string().trim().min(1).max(200),
   guidance: z.string().max(2000).optional(),
   options: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
+  decisionType: z.enum(["关键决定项", "非关键决定项"]).optional(),
   required: z.boolean().default(true),
   evidenceRequiredWhen: z.array(z.string().max(80)).max(100).default([]),
   noteRequiredWhen: z.array(z.string().max(80)).max(100).default([]),

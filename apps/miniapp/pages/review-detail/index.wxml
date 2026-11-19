@@ -1,0 +1,44 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="empty">正在加载审核详情…</view>
+  <view wx:if="{{unauthorized}}" class="error">此功能仅向机构管理员开放。</view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{previewError}}" class="error">{{previewError}}</view>
+  <block wx:if="{{!loading && !unauthorized && order.id}}">
+    <view class="heading card">
+      <text class="eyebrow">{{order.orderNo}} · 修订版 {{revision.revisionNumber}}</text>
+      <text class="title">{{order.vehicle.brand}} {{order.vehicle.model}}</text>
+      <text class="muted">{{order.template.title}} · {{order.template.standardType}}　{{order.vehicle.plate}}</text>
+      <text class="muted">检测师：{{order.inspector.displayName}}　·　里程：{{order.vehicle.mileage || "未填写"}}</text>
+    </view>
+
+    <view wx:for="{{sections}}" wx:key="key" class="section-card">
+      <text class="section-title">{{item.title}} · {{item.items.length}} 项</text>
+      <view wx:for="{{item.items}}" wx:for-item="inspectionItem" wx:key="key" class="item-card">
+        <text class="item-title">{{inspectionItem.title}}</text>
+        <text class="result">{{inspectionItem.resultLabel}}</text>
+        <text wx:if="{{inspectionItem.note}}" class="note">说明：{{inspectionItem.note}}</text>
+        <view wx:if="{{inspectionItem.photos.length}}" class="photo-row">
+          <view wx:for="{{inspectionItem.photos}}" wx:for-item="photo" wx:key="assetId" class="photo-item">
+            <image wx:if="{{photo.previewUrl}}" class="photo-preview" src="{{photo.previewUrl}}" mode="aspectFill" data-url="{{photo.previewUrl}}" bindtap="previewPhoto" />
+            <view wx:else class="photo-placeholder">{{photo.statusLabel}}</view>
+            <text class="small">{{photo.statusLabel}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="card">
+      <text class="section-title">审核结论</text>
+      <label class="field">
+        <text class="field-label">专业结论（通过时可选）</text>
+        <textarea class="textarea" maxlength="2000" value="{{conclusion}}" bindinput="onConclusionInput" placeholder="记录审核结论或报告补充说明" />
+      </label>
+      <label class="field">
+        <text class="field-label">退回意见（退回时必填）</text>
+        <textarea class="textarea" maxlength="2000" value="{{returnComment}}" bindinput="onReturnCommentInput" placeholder="请具体说明需要修正的项目或证据" />
+      </label>
+      <button class="secondary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="returnForModification">退回检测师修改</button>
+      <button class="primary-button" loading="{{saving}}" disabled="{{saving || previewError}}" bindtap="approve">审核通过并生成报告</button>
+    </view>
+  </block>
+</view>

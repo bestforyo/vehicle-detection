@@ -135,7 +135,12 @@ function LoginScreen({ onAuthenticated }: { onAuthenticated: (user: CurrentUser)
         return;
       }
       if (!result.accessToken) throw new Error("登录成功但未建立会话，请联系管理员。");
-      onAuthenticated(await api<CurrentUser>("/auth/me"));
+      const currentUser = await api<CurrentUser>("/auth/me");
+      if (currentUser.platformRole === "NONE") {
+        await endSession();
+        throw new Error("此后台仅供平台运营使用。检测师和机构管理员请使用鉴见微信小程序。");
+      }
+      onAuthenticated(currentUser);
     } catch (reason) {
       setError(messageOf(reason));
     } finally {
@@ -149,7 +154,7 @@ function LoginScreen({ onAuthenticated }: { onAuthenticated: (user: CurrentUser)
         <div className="admin-login-mark"><ShieldCheck size={24} /></div>
         <p className="admin-kicker">INSPECTION STUDIO · ADMIN</p>
         <h1>鉴见管理工作台</h1>
-        <p className="admin-muted">使用已开通的平台或机构管理员账号登录。</p>
+        <p className="admin-muted">此后台仅供平台运营人员登录。检测师和机构管理员请使用「鉴见检测」微信小程序。</p>
         {workspaces.length ? (
           <div className="admin-workspace-picker">
             <strong>选择工作空间</strong>
@@ -228,6 +233,20 @@ function Portal({ user, onLogout }: { user: CurrentUser; onLogout: () => Promise
   }, []);
   const reload = () => setVersion((value) => value + 1);
   const name = user.displayName || user.email || "管理员";
+
+  if (!isPlatform) {
+    return (
+      <main className="admin-login">
+        <section className="admin-login-card">
+          <div className="admin-login-mark"><ShieldCheck size={24} /></div>
+          <p className="admin-kicker">INSPECTION STUDIO</p>
+          <h1>机构工作台已迁移至微信小程序</h1>
+          <p className="admin-muted">检测师和机构管理员请使用「鉴见检测」微信小程序。后台 Web 仅供平台运营人员使用。</p>
+          <button className="admin-button admin-button--primary" onClick={() => void run(onLogout)} type="button">退出并返回登录</button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="admin-layout">

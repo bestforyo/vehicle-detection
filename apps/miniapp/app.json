@@ -2,6 +2,9 @@
   "pages": [
     "pages/login/index",
     "pages/orders/index",
+    "pages/organization/index",
+    "pages/reviews/index",
+    "pages/review-detail/index",
     "pages/templates/index",
     "pages/create-order/index",
     "pages/inspection/index"

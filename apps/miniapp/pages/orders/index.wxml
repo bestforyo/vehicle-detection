@@ -9,6 +9,8 @@
   </view>
   <view wx:if="{{error}}" class="error">{{error}}</view>
   <button class="primary-button" bindtap="createOrder">＋ 创建检测订单</button>
+  <button wx:if="{{isOrganizationAdmin}}" class="secondary-button" bindtap="openReviews">机构审核</button>
+  <button wx:if="{{isOrganizationAdmin}}" class="secondary-button" bindtap="openOrganization">机构与成员管理</button>
   <button class="secondary-button" bindtap="openTemplates">查看已发布模板</button>
   <view wx:if="{{loading}}" class="empty">正在加载机构订单…</view>
   <view wx:elif="{{!orders.length}}" class="card empty">

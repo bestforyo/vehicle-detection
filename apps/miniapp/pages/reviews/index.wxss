@@ -1,0 +1,56 @@
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  margin: 14rpx 0 24rpx;
+}
+
+.eyebrow {
+  color: #8ca09a;
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+}
+
+.review-card {
+  background: #fff;
+  border: 1rpx solid #e5ebe7;
+  border-radius: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin: 18rpx 0;
+  padding: 24rpx;
+}
+
+.review-title {
+  color: #2b3c38;
+  font-size: 29rpx;
+  font-weight: 650;
+}
+
+.review-subtitle {
+  color: #65756f;
+  font-size: 25rpx;
+}
+
+.status {
+  background: #fff3df;
+  border-radius: 30rpx;
+  color: #8d6934;
+  font-size: 21rpx;
+  padding: 8rpx 12rpx;
+}
+
+.empty {
+  color: #84928f;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.card-title {
+  color: #344a40;
+  display: block;
+  font-size: 30rpx;
+  font-weight: 650;
+  margin-bottom: 10rpx;
+}

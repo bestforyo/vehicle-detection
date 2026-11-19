@@ -92,6 +92,7 @@ Page({
     const app = getApp();
     app.globalData.user = user;
     app.globalData.tenantId = user.activeWorkspace.tenantId;
+    app.globalData.workspaceRole = user.activeWorkspace.role;
     wx.redirectTo({ url: "/pages/orders/index" });
   },
 });

@@ -1,0 +1,104 @@
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  margin: 14rpx 0 24rpx;
+}
+
+.eyebrow {
+  color: #8ca09a;
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+}
+
+.section-title {
+  color: #344a40;
+  font-size: 29rpx;
+  font-weight: 650;
+  margin: 34rpx 0 14rpx;
+}
+
+.field-label {
+  color: #576860;
+  display: block;
+  font-size: 23rpx;
+  font-weight: 600;
+  margin: 18rpx 0 10rpx;
+}
+
+.input,
+.textarea {
+  background: #fff;
+  border: 1rpx solid #dfe7e2;
+  border-radius: 12rpx;
+  box-sizing: border-box;
+  padding: 20rpx;
+  width: 100%;
+}
+
+.input {
+  min-height: 82rpx;
+}
+
+.textarea {
+  min-height: 160rpx;
+}
+
+.member-card,
+.invitation-card,
+.audit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.audit-time {
+  color: #84928f;
+  font-size: 20rpx;
+  white-space: nowrap;
+}
+
+.member-name {
+  color: #344a40;
+  font-size: 27rpx;
+  font-weight: 600;
+}
+
+.member-status {
+  border-radius: 24rpx;
+  font-size: 21rpx;
+  padding: 6rpx 12rpx;
+}
+
+.active {
+  background: #edf6ef;
+  color: #477153;
+}
+
+.disabled {
+  background: #f2f3f2;
+  color: #7b8580;
+}
+
+.current-member {
+  text-align: right;
+}
+
+.invitation-share {
+  border-top: 1rpx solid #edf1ee;
+  margin-top: 20rpx;
+  padding-top: 16rpx;
+}
+
+.share-button {
+  background: #376d57;
+  border-radius: 12rpx;
+  color: #fff;
+  font-size: 26rpx;
+  margin: 18rpx 0;
+}
+
+.revoke-button {
+  align-self: flex-end;
+  color: #9a5146;
+}

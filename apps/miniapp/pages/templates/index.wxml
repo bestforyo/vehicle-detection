@@ -1,18 +1,43 @@
 <view class="page">
-  <text class="eyebrow">APPROVED · PUBLISHED</text>
+  <text class="eyebrow">{{isOrganizationAdmin ? "ORGANIZATION · TEMPLATE GOVERNANCE" : "APPROVED · PUBLISHED"}}</text>
   <text class="title">检测模板</text>
-  <text class="muted subtitle">只显示当前机构已审核并发布的模板版本。</text>
+  <text wx:if="{{isOrganizationAdmin}}" class="muted subtitle">导入原型清单后仍为草稿。必须关联平台已审批标准版本，并完成机构复核，才能供检测使用。</text>
+  <text wx:else class="muted subtitle">只显示当前机构已审核并发布的模板版本。</text>
   <view wx:if="{{error}}" class="error">{{error}}</view>
-  <view wx:if="{{loading}}" class="card muted">正在加载模板…</view>
-  <view wx:elif="{{!templates.length}}" class="card empty">
-    <text class="card-title">当前机构尚无可用模板</text>
-    <text class="muted">原型中的国标/团标清单会作为模板配置来源；完成标准来源登记及机构审核发布后，即可在此使用。</text>
+  <button wx:if="{{canImportConfigured}}" class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="importConfigured">导入原型清单（8 种）</button>
+  <view wx:if="{{hasPartialConfiguredTemplates}}" class="error">检测清单已存在部分模板，出于防止覆盖保护，不能重复导入。请联系平台运营核对模板数据。</view>
+  <view wx:if="{{isOrganizationAdmin && !approvedStandards.length}}" class="info card">
+    <text class="muted">平台尚未登记并审批标准版本。模板可保留为草稿，但不能关联、发布或供检测订单使用。</text>
   </view>
-  <view wx:else wx:for="{{templates}}" wx:key="id" class="card template-card">
-    <text class="template-standard">{{item.standardType}} · 修订版 {{item.revisions[0].revisionNumber}}</text>
+  <view wx:if="{{loading}}" class="card muted">正在加载模板…</view>
+  <view wx:elif="{{!templates.length && !canImportConfigured}}" class="card empty">
+    <text class="card-title">当前机构尚无可用模板</text>
+    <text class="muted">正式检测模板必须完成标准来源登记及审批，并经机构复核发布。</text>
+  </view>
+  <view wx:elif="{{!templates.length && canImportConfigured}}" class="card empty">
+    <text class="card-title">当前机构尚无模板</text>
+    <text class="muted">机构管理员可从本页导入八种已配置清单，作为未发布草稿进入审核流程。</text>
+  </view>
+  <view wx:for="{{templates}}" wx:key="id" class="card template-card">
+    <text class="template-standard">{{item.standardType}} · 修订版 {{item.revisions[0].revisionNumber}} · {{item.statusLabel}}</text>
     <text class="card-title">{{item.title}}</text>
     <text class="muted">{{item.usageLabel}} · {{item.vehicleKindLabel}}</text>
     <text class="small">{{item.itemCount}} 个检测项</text>
-    <button class="primary-button" data-index="{{index}}" bindtap="startOrder">使用此模板</button>
+    <text wx:if="{{item.boundStandardLabel}}" class="small">关联标准：{{item.boundStandardLabel}}</text>
+
+    <block wx:if="{{isOrganizationAdmin && !item.isPublished}}">
+      <picker wx:if="{{approvedStandards.length}}" class="picker standard-picker" mode="selector" range="{{approvedStandardLabels}}" value="{{item.selectedStandardIndex}}" data-index="{{index}}" bindchange="onStandardChange">
+        <view class="picker">{{item.selectedStandardId ? approvedStandardLabels[item.selectedStandardIndex] : "选择平台已审批标准版本"}}</view>
+      </picker>
+      <button wx:if="{{approvedStandards.length}}" class="secondary-button" loading="{{saving}}" disabled="{{saving || !item.selectedStandardId}}" data-index="{{index}}" bindtap="linkStandard">关联标准版本</button>
+      <view wx:if="{{item.canPublish}}" class="approval-form">
+        <text class="field-label">机构复核单号</text>
+        <input class="input" maxlength="200" value="{{item.approvalRef}}" data-index="{{index}}" bindinput="onApprovalRefInput" placeholder="输入专业复核单号" />
+        <text class="field-label">机构复核说明</text>
+        <textarea class="textarea" maxlength="2000" value="{{item.approvalNote}}" data-index="{{index}}" bindinput="onApprovalNoteInput" placeholder="记录清单适用范围、逐项复核和判定规则确认" />
+        <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" data-index="{{index}}" bindtap="publishTemplate">审核并发布</button>
+      </view>
+    </block>
+    <button wx:if="{{item.isPublished && item.vehicleKind === 'PASSENGER_CAR'}}" class="primary-button" data-index="{{index}}" bindtap="startOrder">使用此模板</button>
   </view>
 </view>

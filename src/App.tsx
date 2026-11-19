@@ -872,6 +872,7 @@ export function buildConfiguredTemplateImport() {
         title: string;
         guidance?: string;
         options?: string[];
+        decisionType?: "关键决定项" | "非关键决定项";
         required: boolean;
         evidenceRequiredWhen: string[];
         noteRequiredWhen: string[];
@@ -904,6 +905,7 @@ export function buildConfiguredTemplateImport() {
         title: sourceItem.name,
         ...(guidance ? { guidance } : {}),
         ...(options ? { options } : {}),
+        ...(sourceItem.decisionType ? { decisionType: sourceItem.decisionType } : {}),
         required: true,
         evidenceRequiredWhen,
         noteRequiredWhen: [...new Set(noteRequiredWhen)],
