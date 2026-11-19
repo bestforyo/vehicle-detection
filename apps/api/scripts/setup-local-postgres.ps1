@@ -97,6 +97,7 @@ try {
     "# Local development configuration. Do not commit or reuse in production."
     "NODE_ENV=development"
     "PORT=3001"
+    "HOST=127.0.0.1"
     "DATABASE_URL=$databaseUrl"
     "JWT_ACCESS_SECRET=$(New-LocalSecret)"
     "IDENTITY_HASH_SECRET=$(New-LocalSecret)"

@@ -11,7 +11,10 @@ const developmentEnvironment = {
 
 describe("validateEnvironment", () => {
   it("accepts a valid development configuration", () => {
-    expect(validateEnvironment(developmentEnvironment).PORT).toBe(3001);
+    expect(validateEnvironment(developmentEnvironment)).toMatchObject({
+      PORT: 3001,
+      HOST: "127.0.0.1",
+    });
   });
 
   it("requires secure public endpoints and WeChat credentials in production", () => {
