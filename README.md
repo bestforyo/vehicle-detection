@@ -21,13 +21,13 @@ npm.cmd run dev
 
 ### 本地 API（需 Node.js 22、npm 和 PostgreSQL 16+）
 
-确保本机 PostgreSQL 服务正在运行，并通过 pgAdmin 创建本地数据库 `jianjian`（所有者可用本机开发账号）。在 PowerShell 中从仓库根目录复制 API 环境模板：
+确保本机 PostgreSQL 服务正在运行。在 PowerShell 中从仓库根目录运行初始化脚本；脚本会隐藏提示本机 PostgreSQL 数据库所有者密码，创建本地数据库 `jianjian`，并自动生成 Git 忽略的 `apps/api/.env`（含新的随机开发密钥），不会在终端输出密码：
 
 ```powershell
-Copy-Item apps/api/.env.example apps/api/.env
+.\apps\api\scripts\setup-local-postgres.ps1 -PsqlPath "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 ```
 
-在本机编辑 `apps/api/.env`，只在此文件中填写 PostgreSQL 用户密码（不要发送到聊天或提交仓库）。密码需要按 URL 编码后填入 `DATABASE_URL`；例如 `@` 写为 `%40`，`#` 写为 `%23`。环境模板中的 JWT/HMAC/加密密钥仅限本地开发，绝不能用于生产。当前本地开发不要求 Redis、Docker 或对象存储；没有配置 S3 时，照片上传功能不可用。
+将命令中的 `psql.exe` 路径改成本机安装路径。脚本默认账号为 `postgres`；如本机使用其他数据库所有者，可在提示时输入其账号。脚本拒绝覆盖已有 `.env` 或所有者不匹配的现有数据库。当前本地开发不要求 Redis、Docker 或对象存储；没有配置 S3 时，照片上传功能不可用。
 
 ```powershell
 npm.cmd ci
@@ -35,7 +35,7 @@ npm.cmd run db:migrate:deploy
 npm.cmd run start:dev --workspace @jianjian/api
 ```
 
-如果数据库由管理员账号创建，`DATABASE_URL` 中应使用该数据库的所有者账号。请勿在生产环境使用 PostgreSQL 超级用户运行 API。
+以上脚本为单机开发便利而使用数据库所有者账号。请勿在生产环境使用 PostgreSQL 超级用户运行 API。
 
 健康检查：`http://localhost:3001/health/ready`。开发环境 Swagger：`http://localhost:3001/api/docs`。现有 `npm.cmd run dev` 仍启动未接 API 的原型前端。
 
