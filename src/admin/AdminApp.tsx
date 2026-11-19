@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { api, CurrentUser, restoreSession, signIn, Workspace, endSession } from "./api";
+import { buildConfiguredTemplateImport } from "../App";
 import "./admin.css";
 
 type Area = "overview" | "tenants" | "standards" | "platform-audit" | "orders" | "reviews" | "shares" | "members" | "organization" | "templates" | "audit";
@@ -280,7 +281,7 @@ function AreaContent({ area, user, isPlatform, run, setNotice, reload, navigate 
   if (area === "members") return <MembersPage run={run} setNotice={setNotice} />;
   if (area === "reviews") return <ReviewsPage run={run} setNotice={setNotice} />;
   if (area === "shares") return <SharesPage run={run} setNotice={setNotice} />;
-  if (area === "templates") return <TemplatesPage />;
+  if (area === "templates") return <TemplatesPage run={run} setNotice={setNotice} />;
   if (area === "orders") return <OrdersPage user={user} />;
   return <OrganizationOverview user={user} reload={reload} />;
 }
@@ -628,17 +629,133 @@ function OrdersPage({ user }: { user: CurrentUser }) {
   </>;
 }
 
-function TemplatesPage() {
-  const [templates, setTemplates] = useState<Array<Record<string, unknown>>>([]);
+type ManagedTemplate = {
+  id: string;
+  code: string;
+  title: string;
+  vehicleKind: string;
+  usage: string;
+  standardType: string;
+  standardRevision: {
+    id: string;
+    version: string;
+    approvalRef: string | null;
+    approvedAt: string | null;
+    standard: { code: string; title: string };
+  } | null;
+  revisions: Array<{
+    id: string;
+    revisionNumber: number;
+    schema: { sections?: Array<{ items?: unknown[] }> };
+    standardRevisionId: string | null;
+    approvalRef: string | null;
+    approvedAt: string | null;
+    publishedAt: string | null;
+  }>;
+};
+
+type ApprovedStandardRevision = {
+  id: string;
+  version: string;
+  standard: { code: string; title: string };
+};
+
+function TemplatesPage({ run, setNotice }: {
+  run: (action: () => Promise<void>) => Promise<void>;
+  setNotice: (value: string) => void;
+}) {
+  const [templates, setTemplates] = useState<ManagedTemplate[]>([]);
+  const [approvedStandards, setApprovedStandards] = useState<ApprovedStandardRevision[]>([]);
+  const [selectedStandards, setSelectedStandards] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
-  useEffect(() => { void api<Array<Record<string, unknown>>>("/templates").then(setTemplates).catch((reason) => setError(messageOf(reason))); }, []);
+  const load = useCallback(async () => {
+    const [managed, standards] = await Promise.all([
+      api<ManagedTemplate[]>("/templates/management"),
+      api<ApprovedStandardRevision[]>("/templates/approved-standard-revisions"),
+    ]);
+    setTemplates(managed);
+    setApprovedStandards(standards);
+    setError("");
+  }, []);
+  useEffect(() => { void load().catch((reason) => setError(messageOf(reason))); }, [load]);
+
+  async function importConfigured() {
+    await run(async () => {
+      await api("/templates/import-configured", {
+        method: "POST",
+        body: JSON.stringify({ templates: buildConfiguredTemplateImport() }),
+      });
+      setNotice("八种原型检测清单已导入为未发布草稿；关联已审批标准并完成机构复核前，检测师不能用于建单。");
+      await load();
+    });
+  }
+
+  async function linkStandard(template: ManagedTemplate) {
+    const revision = template.revisions[0];
+    const standardRevisionId = selectedStandards[template.id] ?? revision?.standardRevisionId;
+    if (!revision || !standardRevisionId) return;
+    await run(async () => {
+      await api(`/templates/${template.id}/revisions/${revision.id}/standard`, {
+        method: "POST",
+        body: JSON.stringify({ standardRevisionId }),
+      });
+      setNotice(`模板“${template.title}”已关联已审批标准版本。`);
+      await load();
+    });
+  }
+
+  async function publish(template: ManagedTemplate, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const revision = template.revisions[0];
+    if (!revision) return;
+    const data = new FormData(event.currentTarget);
+    await run(async () => {
+      await api(`/templates/${template.id}/revisions/${revision.id}/publish`, {
+        method: "POST",
+        body: JSON.stringify({
+          approvalRef: String(data.get("approvalRef")),
+          approvalNote: String(data.get("approvalNote")),
+        }),
+      });
+      setNotice(`模板“${template.title}”已审核并发布。`);
+      await load();
+    });
+  }
+
   return <>
-    <PageTitle eyebrow="TEMPLATE LIBRARY" title="已发布检测模板" detail="此页仅展示已审核发布的模板；模板编辑与修订工作流尚未开放。没有获批标准时不得发布生产模板。" />
+    <PageTitle eyebrow="TEMPLATE LIBRARY" title="检测模板与草稿" detail="原型清单导入后保持未发布。必须关联平台已审批标准版本，并由机构记录复核依据后才能发布。"
+      action={<button className="admin-button admin-button--primary" disabled={templates.some((template) => template.code.startsWith("car-"))} onClick={() => void importConfigured()} type="button">导入原型清单（8种）</button>} />
     {error && <div className="admin-alert admin-alert--error">{error}</div>}
+    {!approvedStandards.length && <div className="admin-alert admin-alert--error" role="status">尚无平台已审批标准版本。清单可以导入为草稿，但不能关联、发布或供检测订单使用。</div>}
     <div className="admin-template-grid">{templates.map((template) => {
-      const revisions = template.revisions as Array<Record<string, unknown>> | undefined;
-      const latest = revisions?.[0];
-      return <article className="admin-panel admin-template-card" key={String(template.id)}><div className="admin-template-mark"><FileText size={19} /></div><h2>{String(template.title)}</h2><p>{String(template.code)} · {String(template.vehicleKind)} · {String(template.usage)}</p><div className="admin-template-meta"><span>{String(template.standardType)}</span><span>修订版 {String(latest?.revisionNumber ?? "—")}</span></div><small>审核引用：{String(latest?.approvalRef || "—")}</small></article>;
+      const revision = template.revisions[0];
+      const itemCount = revision?.schema.sections?.reduce((total, section) => total + (section.items?.length ?? 0), 0) ?? 0;
+      const isPublished = Boolean(revision?.publishedAt);
+      return <article className="admin-panel admin-template-card" key={template.id}>
+        <div className="admin-template-mark"><FileText size={19} /></div>
+        <h2>{template.title}</h2>
+        <p>{template.code} · {template.vehicleKind} · {template.usage}</p>
+        <div className="admin-template-meta"><span>{template.standardType}</span><span>{itemCount} 个检测项</span><span>修订版 {revision?.revisionNumber ?? "—"}</span></div>
+        <small>{isPublished ? `已发布 · 审核引用：${revision?.approvalRef || "—"}` : "未发布草稿 · 不可用于生产建单"}</small>
+        {!isPublished && revision && <>
+          <Field label="已审批标准版本">
+            <select
+              onChange={(event) => setSelectedStandards((current) => ({ ...current, [template.id]: event.target.value }))}
+              value={selectedStandards[template.id] ?? revision.standardRevisionId ?? ""}
+            >
+              <option value="">选择标准版本</option>
+              {approvedStandards.map((standard) => <option key={standard.id} value={standard.id}>{standard.standard.code} · {standard.version} · {standard.standard.title}</option>)}
+            </select>
+          </Field>
+          <button className="admin-button" disabled={!selectedStandards[template.id] && !revision.standardRevisionId} onClick={() => void linkStandard(template)} type="button">关联标准</button>
+          {template.standardRevision && <p>标准：{template.standardRevision.standard.code} · {template.standardRevision.version}</p>}
+          {revision.standardRevisionId && <form className="admin-form-grid admin-template-approval" onSubmit={(event) => void publish(template, event)}>
+            <Field label="机构复核单号"><input maxLength={200} minLength={3} name="approvalRef" required /></Field>
+            <Field label="复核说明"><textarea maxLength={2000} minLength={10} name="approvalNote" required rows={2} /></Field>
+            <button className="admin-button admin-button--primary" type="submit">审核并发布</button>
+          </form>}
+        </>}
+      </article>;
     })}</div>
     {!templates.length && <div className="admin-panel"><EmptyPanel text="当前机构没有已审核发布的模板。模板建立/编辑端尚未开放，不会使用演示项目冒充生产清单。" /></div>}
   </>;

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -11,6 +12,7 @@ import {
   inspectionTemplateSchema,
   InspectionTemplateSchema,
 } from "./template-schema";
+import { ConfiguredTemplateImportItemDto } from "./templates.dto";
 
 type NewTemplate = {
   code: string;
@@ -35,6 +37,21 @@ function parseTemplateSchema(input: unknown): InspectionTemplateSchema {
   }
   return parsed.data;
 }
+
+const configuredTemplateMetadata: Record<string, {
+  usage: "NEW" | "USED";
+  standardType: "国标" | "团标";
+  itemCount: number;
+}> = {
+  "car-three": { usage: "USED", standardType: "国标", itemCount: 95 },
+  "car-three-group": { usage: "USED", standardType: "团标", itemCount: 115 },
+  "car-four": { usage: "USED", standardType: "国标", itemCount: 101 },
+  "car-four-group": { usage: "USED", standardType: "团标", itemCount: 121 },
+  "car-standard": { usage: "USED", standardType: "国标", itemCount: 160 },
+  "car-group": { usage: "USED", standardType: "团标", itemCount: 180 },
+  "car-new": { usage: "NEW", standardType: "国标", itemCount: 138 },
+  "car-new-group": { usage: "NEW", standardType: "团标", itemCount: 158 },
+};
 
 @Injectable()
 export class TemplatesService {
@@ -73,6 +90,209 @@ export class TemplatesService {
           },
         },
       },
+    });
+  }
+
+  listForManagement(tenantId: string) {
+    return this.prisma.inspectionTemplate.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        vehicleKind: true,
+        usage: true,
+        standardType: true,
+        standardRevision: {
+          select: {
+            id: true,
+            version: true,
+            approvalRef: true,
+            approvedAt: true,
+            standard: { select: { code: true, title: true } },
+          },
+        },
+        revisions: {
+          orderBy: { revisionNumber: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            revisionNumber: true,
+            schema: true,
+            standardRevisionId: true,
+            approvalRef: true,
+            approvedAt: true,
+            publishedAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  listApprovedStandardRevisions() {
+    return this.prisma.standardRevision.findMany({
+      where: { approvedAt: { not: null }, approvalRef: { not: null } },
+      orderBy: [{ standard: { code: "asc" } }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        version: true,
+        standard: { select: { code: true, title: true } },
+      },
+    });
+  }
+
+  async importConfiguredTemplates(
+    tenantId: string,
+    templates: ConfiguredTemplateImportItemDto[],
+    actor: AuthenticatedActor,
+  ) {
+    const codes = templates.map((template) => template.code);
+    if (new Set(codes).size !== Object.keys(configuredTemplateMetadata).length
+      || Object.keys(configuredTemplateMetadata).some((code) => !codes.includes(code))) {
+      throw new BadRequestException("必须一次导入完整且不重复的八种已配置检测模板。");
+    }
+
+    const normalized = templates.map((template) => {
+      const metadata = configuredTemplateMetadata[template.code];
+      if (!template.title.trim()) {
+        throw new BadRequestException(`模板“${template.code}”必须填写名称。`);
+      }
+      if (template.vehicleKind !== "PASSENGER_CAR"
+        || template.usage !== metadata.usage
+        || template.standardType !== metadata.standardType) {
+        throw new BadRequestException(`模板“${template.code}”的车辆类型或标准类别与原型配置不一致。`);
+      }
+      const schema = parseTemplateSchema(template.schema);
+      const itemCount = schema.sections.reduce((total, section) => total + section.items.length, 0);
+      if (itemCount !== metadata.itemCount) {
+        throw new UnprocessableEntityException(`模板“${template.code}”应包含 ${metadata.itemCount} 个检测项，实际为 ${itemCount} 个。`);
+      }
+      return { ...template, schema };
+    });
+
+    return this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.inspectionTemplate.findFirst({
+        where: { tenantId, code: { in: codes } },
+        select: { code: true },
+      });
+      if (existing) {
+        throw new ConflictException(`模板“${existing.code}”已存在，未覆盖任何内容。`);
+      }
+      const result: Array<{
+        id: string;
+        code: string;
+        title: string;
+        revisionId: string;
+        revisionNumber: number;
+        itemCount: number;
+        status: "DRAFT";
+      }> = [];
+      for (const template of normalized) {
+        const created = await transaction.inspectionTemplate.create({
+          data: {
+            tenantId,
+            code: template.code,
+            title: template.title.trim(),
+            vehicleKind: template.vehicleKind,
+            usage: template.usage,
+            standardType: template.standardType,
+          },
+        });
+        const revision = await transaction.templateRevision.create({
+          data: {
+            tenantId,
+            templateId: created.id,
+            revisionNumber: 1,
+            schema: template.schema as object,
+          },
+        });
+        await this.audit.record({
+          tenantId,
+          actorId: actor.userId,
+          action: "template.prototype_import",
+          resourceType: "template_revision",
+          resourceId: revision.id,
+          metadata: {
+            templateCode: created.code,
+            revisionNumber: revision.revisionNumber,
+            itemCount: configuredTemplateMetadata[template.code].itemCount,
+            status: "DRAFT",
+          },
+        }, transaction);
+        result.push({
+          id: created.id,
+          code: created.code,
+          title: created.title,
+          revisionId: revision.id,
+          revisionNumber: revision.revisionNumber,
+          itemCount: configuredTemplateMetadata[template.code].itemCount,
+          status: "DRAFT",
+        });
+      }
+      return result;
+    });
+  }
+
+  async linkApprovedStandardRevision(
+    tenantId: string,
+    templateId: string,
+    revisionId: string,
+    standardRevisionId: string,
+    actor: AuthenticatedActor,
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      const revision = await transaction.templateRevision.findFirst({
+        where: { tenantId, templateId, id: revisionId, publishedAt: null },
+        select: { id: true, revisionNumber: true, standardRevisionId: true },
+      });
+      if (!revision) {
+        throw new NotFoundException("待关联的模板草稿不存在或已发布。");
+      }
+      const standardRevision = await transaction.standardRevision.findUnique({
+        where: { id: standardRevisionId },
+        select: {
+          id: true,
+          version: true,
+          approvalRef: true,
+          approvedAt: true,
+          standard: { select: { code: true, title: true } },
+        },
+      });
+      if (!standardRevision?.approvedAt || !standardRevision.approvalRef) {
+        throw new BadRequestException("只能关联平台已审批且记录了审核依据的标准版本。");
+      }
+      const templateUpdated = await transaction.inspectionTemplate.updateMany({
+        where: { tenantId, id: templateId },
+        data: { standardRevisionId },
+      });
+      if (templateUpdated.count !== 1) {
+        throw new NotFoundException("检测模板不存在。");
+      }
+      await transaction.templateRevision.update({
+        where: { id: revision.id },
+        data: { standardRevisionId },
+      });
+      await this.audit.record({
+        tenantId,
+        actorId: actor.userId,
+        action: "template.standard_revision.link",
+        resourceType: "template_revision",
+        resourceId: revision.id,
+        metadata: {
+          revisionNumber: revision.revisionNumber,
+          standardCode: standardRevision.standard.code,
+          standardVersion: standardRevision.version,
+          standardRevisionId,
+        },
+      }, transaction);
+      return {
+        id: revision.id,
+        standardRevisionId,
+        standardCode: standardRevision.standard.code,
+        standardTitle: standardRevision.standard.title,
+        standardVersion: standardRevision.version,
+      };
     });
   }
 

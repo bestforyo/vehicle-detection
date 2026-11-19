@@ -821,6 +821,110 @@ function checklistFor(templateId: string, initialResult = "待检查"): Inspecti
   }));
 }
 
+const configuredProductionTemplateIds = [
+  "car-three",
+  "car-three-group",
+  "car-four",
+  "car-four-group",
+  "car-standard",
+  "car-group",
+  "car-new",
+  "car-new-group",
+] as const;
+
+const expectedConfiguredItemCounts: Record<(typeof configuredProductionTemplateIds)[number], number> = {
+  "car-three": 95,
+  "car-three-group": 115,
+  "car-four": 101,
+  "car-four-group": 121,
+  "car-standard": 160,
+  "car-group": 180,
+  "car-new": 138,
+  "car-new-group": 158,
+};
+
+const normalInspectionResults = new Set([
+  "待检查",
+  "正常",
+  "敞篷正常",
+  "数据正常",
+  "无故障码",
+  "此项检测无此服务",
+  "未配备",
+]);
+
+export function buildConfiguredTemplateImport() {
+  return configuredProductionTemplateIds.map((templateId) => {
+    const template = templates.find((candidate) => candidate.id === templateId);
+    const checklist = checklists[templateId];
+    if (!template || !checklist) {
+      throw new Error(`已配置检测模板不存在：${templateId}`);
+    }
+    if (checklist.length !== expectedConfiguredItemCounts[templateId]) {
+      throw new Error(`检测模板“${template.name}”项目数量与已配置清单不一致。`);
+    }
+
+    const sectionMap = new Map<string, {
+      key: string;
+      title: string;
+      items: Array<{
+        key: string;
+        title: string;
+        guidance?: string;
+        options?: string[];
+        required: boolean;
+        evidenceRequiredWhen: string[];
+        noteRequiredWhen: string[];
+        thresholdRequiredWhen: string[];
+      }>;
+    }>();
+    checklist.forEach((sourceItem, itemIndex) => {
+      let section = sectionMap.get(sourceItem.section);
+      if (!section) {
+        section = {
+          key: `section-${sectionMap.size + 1}`,
+          title: sourceItem.section,
+          items: [],
+        };
+        sectionMap.set(sourceItem.section, section);
+      }
+      const options = sourceItem.options ? [...new Set(sourceItem.options)] : undefined;
+      const noteRequiredWhen = [
+        ...(sourceItem.requiresWaterNote ? ["水渍泥沙"] : []),
+        ...(options?.includes("自定义") ? ["自定义"] : []),
+        ...(sourceItem.customNoteResults ?? []),
+      ];
+      const evidenceRequiredWhen = options?.filter((option) => !normalInspectionResults.has(option)) ?? [];
+      const guidance = [
+        sourceItem.material ? `检测材质：${sourceItem.material}` : "",
+        sourceItem.customNotePrompt ?? "",
+      ].filter(Boolean).join("；");
+      section.items.push({
+        key: `item-${String(itemIndex + 1).padStart(3, "0")}`,
+        title: sourceItem.name,
+        ...(guidance ? { guidance } : {}),
+        ...(options ? { options } : {}),
+        required: true,
+        evidenceRequiredWhen,
+        noteRequiredWhen: [...new Set(noteRequiredWhen)],
+        thresholdRequiredWhen: sourceItem.thresholdOptions ? [...sourceItem.thresholdOptions] : [],
+      });
+    });
+
+    return {
+      code: template.id,
+      title: template.name,
+      vehicleKind: "PASSENGER_CAR" as const,
+      usage: template.vehicleType === "新车" ? "NEW" as const : "USED" as const,
+      standardType: template.standardType === "国标" ? "国标" as const : "团标" as const,
+      schema: {
+        version: 1 as const,
+        sections: [...sectionMap.values()],
+      },
+    };
+  });
+}
+
 function isInspectionItemComplete(item: InspectionItem) {
   return item.result !== "待检查"
     && !((item.result === "自定义" || item.customNoteResults?.includes(item.result)) && !item.customResult?.trim())

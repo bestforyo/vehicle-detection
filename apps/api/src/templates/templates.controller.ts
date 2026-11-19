@@ -15,7 +15,13 @@ import { RequireMembershipRole } from "../auth/access.decorator";
 import { CurrentActor } from "../auth/current-actor.decorator";
 import { RolesGuard } from "../auth/roles.guard";
 import { AuthenticatedActor } from "../auth/auth.types";
-import { CreateTemplateDto, CreateTemplateRevisionDto, PublishTemplateRevisionDto } from "./templates.dto";
+import {
+  CreateTemplateDto,
+  CreateTemplateRevisionDto,
+  ImportConfiguredTemplatesDto,
+  LinkStandardRevisionDto,
+  PublishTemplateRevisionDto,
+} from "./templates.dto";
 import { TemplatesService } from "./templates.service";
 
 @Controller("templates")
@@ -33,6 +39,28 @@ export class TemplatesController {
       return [];
     }
     return this.templates.list(actor.tenantId, vehicleKind, usage);
+  }
+
+  @Get("management")
+  @RequireMembershipRole(MembershipRole.ORG_ADMIN)
+  management(@CurrentActor() actor: AuthenticatedActor) {
+    return this.templates.listForManagement(this.requireTenant(actor));
+  }
+
+  @Get("approved-standard-revisions")
+  @RequireMembershipRole(MembershipRole.ORG_ADMIN)
+  approvedStandardRevisions(@CurrentActor() actor: AuthenticatedActor) {
+    this.requireTenant(actor);
+    return this.templates.listApprovedStandardRevisions();
+  }
+
+  @Post("import-configured")
+  @RequireMembershipRole(MembershipRole.ORG_ADMIN)
+  importConfigured(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Body() body: ImportConfiguredTemplatesDto,
+  ) {
+    return this.templates.importConfiguredTemplates(this.requireTenant(actor), body.templates, actor);
   }
 
   @Get(":templateId/revisions/:revisionId")
@@ -80,6 +108,23 @@ export class TemplatesController {
       revisionId,
       body.approvalRef,
       body.approvalNote,
+      actor,
+    );
+  }
+
+  @Post(":templateId/revisions/:revisionId/standard")
+  @RequireMembershipRole(MembershipRole.ORG_ADMIN)
+  linkStandard(
+    @CurrentActor() actor: AuthenticatedActor,
+    @Param("templateId", ParseUUIDPipe) templateId: string,
+    @Param("revisionId", ParseUUIDPipe) revisionId: string,
+    @Body() body: LinkStandardRevisionDto,
+  ) {
+    return this.templates.linkApprovedStandardRevision(
+      this.requireTenant(actor),
+      templateId,
+      revisionId,
+      body.standardRevisionId,
       actor,
     );
   }
