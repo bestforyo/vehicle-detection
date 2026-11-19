@@ -128,10 +128,22 @@ export class ReviewsService {
           vehicle: true,
           template: { select: { title: true, standardType: true } },
           templateRevision: {
-            select: { revisionNumber: true, approvalRef: true, standardRevision: { select: { version: true } } },
+            select: {
+              revisionNumber: true,
+              approvalRef: true,
+              standardRevision: {
+                select: {
+                  version: true,
+                  effectiveAt: true,
+                  scope: true,
+                  approvedAt: true,
+                  standard: { select: { licenseRef: true } },
+                },
+              },
+            },
           },
           inspector: { select: { userId: true, user: { select: { displayName: true } } } },
-          tenant: { select: { name: true } },
+          tenant: { select: { name: true, settings: true } },
           revisions: {
             where: { id: input.revisionId, status: InspectionRevisionStatus.SUBMITTED },
             include: { answers: true, evidence: { include: { asset: true } } },
@@ -146,6 +158,9 @@ export class ReviewsService {
         throw new ForbiddenException("检测师不能审核自己提交的检测版本。");
       }
       const revision = order.revisions[0];
+      if (!order.templateRevision.standardRevision?.approvedAt) {
+        throw new UnprocessableEntityException("报告引用的检测标准尚未通过平台审批，不能发布。");
+      }
       if (revision.evidence.some((entry) => entry.asset.scanStatus !== "CLEAN")) {
         throw new UnprocessableEntityException("报告包含未完成安全检查的照片，暂不能发布。");
       }
@@ -161,11 +176,19 @@ export class ReviewsService {
       }));
       const publishedAt = new Date();
       const reportNo = `RPT${publishedAt.toISOString().slice(0, 10).replace(/-/g, "")}${randomBytes(6).toString("hex").toUpperCase()}`;
+      const tenantSettings = order.tenant.settings;
+      const settings = tenantSettings && typeof tenantSettings === "object" && !Array.isArray(tenantSettings)
+        ? tenantSettings as Record<string, unknown>
+        : {};
       const snapshot: Prisma.InputJsonObject = {
         version: 1,
         reportNo,
         orderNo: order.orderNo,
-        tenant: { name: order.tenant.name },
+        tenant: {
+          name: order.tenant.name,
+          displayName: typeof settings.displayName === "string" ? settings.displayName : order.tenant.name,
+          reportDisclaimer: typeof settings.reportDisclaimer === "string" ? settings.reportDisclaimer : null,
+        },
         publishedAt: publishedAt.toISOString(),
         vehicle: {
           kind: order.vehicle.kind,
@@ -181,6 +204,9 @@ export class ReviewsService {
           title: order.template.title,
           standardType: order.template.standardType,
           standardVersion: order.templateRevision.standardRevision?.version ?? null,
+          standardEffectiveAt: order.templateRevision.standardRevision?.effectiveAt?.toISOString() ?? null,
+          coverageScope: order.templateRevision.standardRevision?.scope ?? null,
+          standardLicenseRef: order.templateRevision.standardRevision?.standard.licenseRef ?? null,
           revisionNumber: order.templateRevision.revisionNumber,
           approvalRef: order.templateRevision.approvalRef,
         },

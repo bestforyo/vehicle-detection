@@ -10,7 +10,20 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { MembershipRole, PlatformRole, TenantStatus } from "@prisma/client";
-import { IsEmail, IsIn, IsOptional, IsString, Length, Matches, MaxLength } from "class-validator";
+import {
+  IsDateString,
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from "class-validator";
 import { AccessTokenGuard } from "../auth/access-token.guard";
 import { CreateInvitationDto } from "../auth/auth.dto";
 import { RequireMembershipRole, RequirePlatformRole } from "../auth/access.decorator";
@@ -32,6 +45,63 @@ class CreateTenantDto {
 class TenantStatusDto {
   @IsIn([TenantStatus.ACTIVE, TenantStatus.SUSPENDED, TenantStatus.CLOSED])
   status!: TenantStatus;
+
+  @IsString()
+  @Length(10, 1000)
+  @Matches(/\S/)
+  reason!: string;
+
+  @IsString()
+  @Matches(/^[A-Za-z0-9._/-]{3,80}$/)
+  ticketNumber!: string;
+}
+
+class TenantSubscriptionDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z0-9][A-Z0-9_-]{1,39}$/)
+  planCode?: string;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @IsDateString()
+  expiresAt?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  seatLimit?: number;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @IsInt()
+  @Min(1)
+  @Max(1000000)
+  monthlyOrderLimit?: number | null;
+
+  @IsString()
+  @Length(10, 1000)
+  @Matches(/\S/)
+  reason!: string;
+
+  @IsString()
+  @Matches(/^[A-Za-z0-9._/-]{3,80}$/)
+  ticketNumber!: string;
+}
+
+class TenantMemberRoleDto {
+  @IsIn([MembershipRole.INSPECTOR, MembershipRole.ORG_ADMIN])
+  role!: MembershipRole;
+
+  @IsString()
+  @Length(10, 1000)
+  @Matches(/\S/)
+  reason!: string;
+
+  @IsString()
+  @Matches(/^[A-Za-z0-9._/-]{3,80}$/)
+  ticketNumber!: string;
 }
 
 class TenantInvitationDto extends CreateInvitationDto {
@@ -55,6 +125,21 @@ export class TenantsController {
     return this.tenants.listTenants(cursor, limit ? Number(limit) : 25);
   }
 
+  @Get("overview")
+  @RequirePlatformRole(PlatformRole.OPERATOR, PlatformRole.SUPER_ADMIN)
+  getOverview() {
+    return this.tenants.getPlatformOverview();
+  }
+
+  @Get("audit")
+  @RequirePlatformRole(PlatformRole.OPERATOR, PlatformRole.SUPER_ADMIN)
+  listPlatformAudit(
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.tenants.listPlatformAudit(cursor, limit ? Number(limit) : 25);
+  }
+
   @Post()
   @RequirePlatformRole(PlatformRole.SUPER_ADMIN)
   create(@Body() body: CreateTenantDto, @CurrentActor() actor: AuthenticatedActor) {
@@ -68,7 +153,31 @@ export class TenantsController {
     @Body() body: TenantStatusDto,
     @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.tenants.changeStatus(tenantId, body.status, actor);
+    return this.tenants.changeStatus(tenantId, body.status, {
+      reason: body.reason,
+      ticketNumber: body.ticketNumber,
+    }, actor);
+  }
+
+  @Patch(":tenantId/subscription")
+  @RequirePlatformRole(PlatformRole.SUPER_ADMIN)
+  updateSubscription(
+    @Param("tenantId", ParseUUIDPipe) tenantId: string,
+    @Body() body: TenantSubscriptionDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.tenants.updateSubscription(tenantId, body, actor);
+  }
+
+  @Patch(":tenantId/members/:membershipId/role")
+  @RequirePlatformRole(PlatformRole.SUPER_ADMIN)
+  changeMemberRole(
+    @Param("tenantId", ParseUUIDPipe) tenantId: string,
+    @Param("membershipId", ParseUUIDPipe) membershipId: string,
+    @Body() body: TenantMemberRoleDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.tenants.changeMembershipRole(tenantId, membershipId, body, actor);
   }
 
   @Post(":tenantId/invitations")

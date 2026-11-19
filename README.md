@@ -1,13 +1,15 @@
 # 鉴见 · 车辆检测工作台
 
-车辆检测平台工作区，包含现有 React 检测师端交互原型，以及正在建设中的 NestJS API 和 PostgreSQL 后端。**当前版本尚未达到可供真实机构上线使用的状态**：现有前端仍使用演示数据，尚未接入 API；微信小程序、机构/平台管理界面和公开报告 H5 也尚未交付。不要将其作为生产系统部署或录入真实客户资料。
+车辆检测平台工作区，包含 React 检测师端交互原型、机构/平台管理 Web 初版，以及 NestJS API 和 PostgreSQL 后端。**当前版本尚未达到可供真实机构上线使用的状态**：检测师原型仍使用演示数据；微信小程序、公开报告 H5 和生产级完整管理工作流尚未交付。不要将其作为生产系统部署或录入真实客户资料。
 
 ## 当前后端基础
 
 - NestJS API，按机构租户隔离，包含微信身份/邀请登录、角色校验、模板版本、订单与检测修订、证据媒体、审核发布、报告分享和健康检查模块。
 - Prisma/PostgreSQL 数据模型及初始迁移；平台管理员通过一次性 bootstrap 脚本创建，不包含默认账号或默认密码。
 - 支持私有 S3 兼容对象存储；本地可用 Docker Compose 启动 PostgreSQL 和可选 MinIO。
-- API 有 Jest 单元测试与独立 TypeScript 构建；已在本机 PostgreSQL 18.7 上应用初始迁移，并验证 API readiness、Swagger 与未登录请求的 401 行为。这不等于生产环境验收或真实业务端到端验收。
+- API 有 Jest 单元测试与独立 TypeScript 构建；已在本机 PostgreSQL 18.7 上应用迁移，并验证 API readiness、Swagger 与未登录请求的 401 行为。这不等于生产环境验收或真实业务端到端验收。
+- 已加入机构成员/邀请/审计/资料管理及平台套餐、席位、月订单额度、到期与支持操作审计；正式标准需经平台单独录入来源/授权并审批，模板只能引用已审批标准。当前未导入任何标准或生产模板，等待用户提供权威文件与专业审核信息。
+- 管理 Web 初版位于 `/admin`，可使用已有密码账号登录，提供平台机构/订阅/邀请/标准审批与机构资料/成员/订单/审核/分享/审计界面。登录令牌只在当前标签页内维护并通过刷新令牌续期；邀请接受仍需已配置的微信小程序。公开报告只读 H5 使用 `/r/:token`；模板编辑、小程序、生产照片存储配置和完整端到端验收尚未交付，不能视为完整客户端。
 - 当前没有生产域名/TLS 反向代理、备份恢复验证、正式标准模板、微信小程序客户端或线上环境配置。
 
 ## 本地运行
@@ -37,7 +39,7 @@ npm.cmd run start:dev --workspace @jianjian/api
 
 以上脚本为单机开发便利而使用数据库所有者账号。请勿在生产环境使用 PostgreSQL 超级用户运行 API。
 
-健康检查：`http://localhost:3001/health/ready`。开发环境 Swagger：`http://localhost:3001/api/docs`。现有 `npm.cmd run dev` 仍启动未接 API 的原型前端。
+健康检查：`http://localhost:3001/health/ready`。开发环境 Swagger：`http://localhost:3001/api/docs`。管理 Web 通过 `npm.cmd run dev` 启动，访问 `http://localhost:5173/admin`；默认 API 地址为 `http://127.0.0.1:3001/api/v1`，部署时通过 `VITE_API_BASE_URL` 指向 HTTPS API。报告分享 URL 应使用配置的 HTTPS `PUBLIC_REPORT_BASE_URL`，并将其路由到 `/r/:token`。其余根路径仍是未接 API 的检测师演示原型。
 
 ### Compose 部署基础（不是完整生产发布）
 

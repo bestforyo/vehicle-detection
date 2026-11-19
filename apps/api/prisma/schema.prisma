@@ -71,6 +71,10 @@ model Tenant {
   code            String               @unique
   name            String
   status          TenantStatus         @default(ACTIVE)
+  planCode        String               @default("TRIAL")
+  expiresAt       DateTime?
+  seatLimit       Int                  @default(5)
+  monthlyOrderLimit Int?
   settings        Json                 @default("{}")
   memberships     TenantMembership[]
   invitations     TenantInvitation[]
@@ -164,20 +168,26 @@ model Session {
 }
 
 model Standard {
-  id        String             @id @default(uuid()) @db.Uuid
-  code      String             @unique
-  title     String
-  owner     String?
-  revisions StandardRevision[]
+  id         String             @id @default(uuid()) @db.Uuid
+  code       String             @unique
+  title      String
+  owner      String?
+  licenseRef String?
+  revisions  StandardRevision[]
 }
 
 model StandardRevision {
   id                String               @id @default(uuid()) @db.Uuid
   standardId        String               @db.Uuid
   version           String
+  sourceFileName    String?
   sourceHash        String?
+  effectiveAt       DateTime?
+  scope             String?
   approvalRef       String?
+  approvedBy        String?              @db.Uuid
   approvedAt        DateTime?
+  createdAt         DateTime             @default(now())
   standard          Standard             @relation(fields: [standardId], references: [id], onDelete: Restrict)
   templates         InspectionTemplate[]
   templateRevisions TemplateRevision[]

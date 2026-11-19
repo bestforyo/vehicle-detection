@@ -20,16 +20,8 @@ export class CreateTemplateDto {
   standardCode!: string;
 
   @IsString()
-  @Length(1, 200)
-  standardTitle!: string;
-
-  @IsString()
   @Length(1, 40)
   standardVersion!: string;
-
-  @IsString()
-  @Length(1, 200)
-  approvalRef!: string;
 
   @IsObject()
   schema!: Record<string, unknown>;

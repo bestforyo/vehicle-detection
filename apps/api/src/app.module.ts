@@ -11,6 +11,7 @@ import { OrdersModule } from "./orders/orders.module";
 import { MediaModule } from "./media/media.module";
 import { ReviewsModule } from "./reviews/reviews.module";
 import { ReportsModule } from "./reports/reports.module";
+import { StandardsModule } from "./standards/standards.module";
 import { DatabaseModule } from "./database/database.module";
 
 @Module({
@@ -29,6 +30,7 @@ import { DatabaseModule } from "./database/database.module";
     MediaModule,
     ReviewsModule,
     ReportsModule,
+    StandardsModule,
   ],
   controllers: [HealthController],
   providers: [

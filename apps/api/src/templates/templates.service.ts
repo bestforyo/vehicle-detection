@@ -18,9 +18,7 @@ type NewTemplate = {
   vehicleKind: string;
   usage: string;
   standardCode: string;
-  standardTitle: string;
   standardVersion: string;
-  approvalRef: string;
   schema: Record<string, unknown>;
 };
 
@@ -111,35 +109,24 @@ export class TemplatesService {
 
   async create(tenantId: string, input: NewTemplate, actor: AuthenticatedActor) {
     const schema = parseTemplateSchema(input.schema);
-    if (!input.approvalRef.trim()) {
-      throw new BadRequestException("发布检测模板前必须记录专业审核依据。");
-    }
-
     const created = await this.prisma.$transaction(async (transaction) => {
-      const standard = await transaction.standard.upsert({
+      const standard = await transaction.standard.findUnique({
         where: { code: input.standardCode.trim() },
-        create: {
-          code: input.standardCode.trim(),
-          title: input.standardTitle.trim(),
-        },
-        update: {},
+        select: { id: true },
       });
-      const standardRevision = await transaction.standardRevision.upsert({
+      if (!standard) {
+        throw new BadRequestException("该标准尚未由平台录入并审批，不能创建正式检测模板。");
+      }
+      const standardRevision = await transaction.standardRevision.findUnique({
         where: {
           standardId_version: {
             standardId: standard.id,
             version: input.standardVersion.trim(),
           },
         },
-        create: {
-          standardId: standard.id,
-          version: input.standardVersion.trim(),
-          approvalRef: input.approvalRef.trim(),
-          approvedAt: new Date(),
-        },
-        update: {},
+        select: { id: true, approvedAt: true, approvalRef: true },
       });
-      if (!standardRevision.approvedAt || !standardRevision.approvalRef) {
+      if (!standardRevision?.approvedAt || !standardRevision.approvalRef) {
         throw new BadRequestException("该标准版本尚未完成审核，不能发布检测模板。");
       }
 
@@ -161,16 +148,12 @@ export class TemplatesService {
           revisionNumber: 1,
           schema: schema as object,
           standardRevisionId: standardRevision.id,
-          approvalRef: input.approvalRef.trim(),
-          approvedAt: new Date(),
-          publishedAt: new Date(),
-          publishedBy: actor.userId,
         },
       });
       await this.audit.record({
         tenantId,
         actorId: actor.userId,
-        action: "template.create_and_publish",
+        action: "template.create",
         resourceType: "template_revision",
         resourceId: revision.id,
         metadata: { templateCode: template.code, standardRevisionId: standardRevision.id },
@@ -185,6 +168,7 @@ export class TemplatesService {
       revisionId: created.revision.id,
       revisionNumber: created.revision.revisionNumber,
       publishedAt: created.revision.publishedAt,
+      status: "DRAFT",
     };
   }
 
@@ -240,9 +224,13 @@ export class TemplatesService {
     return this.prisma.$transaction(async (transaction) => {
       const revision = await transaction.templateRevision.findFirst({
         where: { id: revisionId, tenantId, templateId, publishedAt: null },
+        include: { standardRevision: { select: { approvedAt: true, approvalRef: true } } },
       });
       if (!revision) {
         throw new NotFoundException("待发布的模板修订不存在，或该版本已不可变。");
+      }
+      if (!revision.standardRevision?.approvedAt || !revision.standardRevision.approvalRef) {
+        throw new BadRequestException("模板引用的标准版本未通过平台审批，不能发布。");
       }
       parseTemplateSchema(revision.schema);
       const result = await transaction.templateRevision.updateMany({

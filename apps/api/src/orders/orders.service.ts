@@ -90,6 +90,28 @@ export class OrdersService {
         if (existing) {
           await transaction.idempotencyKey.delete({ where: { id: existing.id } });
         }
+        const tenant = await transaction.tenant.findFirst({
+          where: {
+            id: tenantId,
+            status: "ACTIVE",
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+          select: { monthlyOrderLimit: true },
+        });
+        if (!tenant) {
+          throw new ForbiddenException("机构已停用或服务期限已结束。");
+        }
+        if (tenant.monthlyOrderLimit !== null) {
+          const monthStart = new Date();
+          monthStart.setUTCHours(0, 0, 0, 0);
+          monthStart.setUTCDate(1);
+          const monthlyOrders = await transaction.inspectionOrder.count({
+            where: { tenantId, createdAt: { gte: monthStart } },
+          });
+          if (monthlyOrders >= tenant.monthlyOrderLimit) {
+            throw new UnprocessableEntityException("机构本月订单额度已用完，请联系平台管理员调整套餐。");
+          }
+        }
         const templateRevision = await transaction.templateRevision.findFirst({
           where: {
             id: input.templateRevisionId,

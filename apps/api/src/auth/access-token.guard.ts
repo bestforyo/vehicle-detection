@@ -49,7 +49,7 @@ export class AccessTokenGuard implements CanActivate {
         user: { select: { id: true, status: true, platformRole: true } },
         membership: {
           include: {
-            tenant: { select: { id: true, status: true } },
+            tenant: { select: { id: true, status: true, expiresAt: true } },
           },
         },
       },
@@ -67,6 +67,7 @@ export class AccessTokenGuard implements CanActivate {
       !session.membership
       || session.membership.status !== "ACTIVE"
       || session.membership.tenant.status !== "ACTIVE"
+      || session.membership.tenant.expiresAt && session.membership.tenant.expiresAt <= new Date()
     )) {
       throw new UnauthorizedException("机构账号已停用或机构不可用。");
     }

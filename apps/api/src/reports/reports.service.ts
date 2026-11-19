@@ -197,7 +197,10 @@ export class ReportsService {
         expiresAt: { gt: new Date() },
         report: {
           status: ReportStatus.PUBLISHED,
-          tenant: { status: "ACTIVE" },
+          tenant: {
+            status: "ACTIVE",
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
         },
       },
       include: {

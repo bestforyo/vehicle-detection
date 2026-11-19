@@ -19,7 +19,7 @@ type UserWithMemberships = Prisma.UserGetPayload<{
   include: {
     memberships: {
       where: { status: "ACTIVE" };
-      include: { tenant: { select: { id: true; name: true; code: true; status: true } } };
+      include: { tenant: { select: { id: true; name: true; code: true; status: true; expiresAt: true } } };
     };
   };
 }>;
@@ -30,6 +30,10 @@ type WeChatSessionResponse = {
   errcode?: number;
   errmsg?: string;
 };
+
+function isTenantAvailable(tenant: { status: TenantStatus; expiresAt?: Date | null }): boolean {
+  return tenant.status === TenantStatus.ACTIVE && (!tenant.expiresAt || tenant.expiresAt > new Date());
+}
 
 @Injectable()
 export class AuthService {
@@ -119,10 +123,10 @@ export class AuthService {
     const result = await this.prisma.$transaction(async (transaction) => {
       const invitation = await transaction.tenantInvitation.findUnique({
         where: { tokenHash },
-        include: { tenant: { select: { id: true, status: true } } },
+        include: { tenant: { select: { id: true, status: true, expiresAt: true } } },
       });
       if (!invitation || invitation.acceptedAt || invitation.expiresAt <= new Date()
-        || invitation.tenant.status !== "ACTIVE") {
+        || !isTenantAvailable(invitation.tenant)) {
         throw new UnauthorizedException("邀请链接无效、已使用或已过期。");
       }
 
@@ -211,7 +215,7 @@ export class AuthService {
   async signInWithPassword(email: string, password: string, requestedTenantId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
-      include: { memberships: { include: { tenant: { select: { id: true, name: true, code: true, status: true } } } } },
+      include: { memberships: { include: { tenant: { select: { id: true, name: true, code: true, status: true, expiresAt: true } } } } },
     });
     const passwordHash = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
     let passwordMatches = false;
@@ -225,7 +229,7 @@ export class AuthService {
     }
 
     const memberships = user.memberships.filter(
-      (membership) => membership.status === "ACTIVE" && membership.tenant.status === "ACTIVE",
+      (membership) => membership.status === "ACTIVE" && isTenantAvailable(membership.tenant),
     );
     return this.selectWorkspace({ ...user, memberships } as UserWithMemberships, requestedTenantId);
   }
@@ -236,7 +240,7 @@ export class AuthService {
       where: { refreshHash },
       include: {
         user: { select: { id: true, status: true, platformRole: true } },
-        membership: { include: { tenant: { select: { id: true, status: true } } } },
+        membership: { include: { tenant: { select: { id: true, status: true, expiresAt: true } } } },
       },
     });
 
@@ -258,7 +262,7 @@ export class AuthService {
     }
     if (session.tenantId && (
       !session.membership || session.membership.status !== "ACTIVE"
-      || session.membership.tenant.status !== "ACTIVE"
+      || !isTenantAvailable(session.membership.tenant)
     )) {
       throw new UnauthorizedException("机构账号已停用或机构不可用。");
     }
@@ -305,7 +309,13 @@ export class AuthService {
         email: true,
         platformRole: true,
         memberships: {
-          where: { status: "ACTIVE", tenant: { status: TenantStatus.ACTIVE } },
+          where: {
+            status: "ACTIVE",
+            tenant: {
+              status: TenantStatus.ACTIVE,
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            },
+          },
           select: {
             id: true,
             role: true,
@@ -322,7 +332,10 @@ export class AuthService {
         tenantId,
         userId: actor.userId,
         status: "ACTIVE",
-        tenant: { status: "ACTIVE" },
+        tenant: {
+          status: "ACTIVE",
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
       },
       select: { id: true },
     });
@@ -366,15 +379,21 @@ export class AuthService {
   private activeMembershipsInclude() {
     return {
       memberships: {
-        where: { status: "ACTIVE" as const, tenant: { status: TenantStatus.ACTIVE } },
-        include: { tenant: { select: { id: true, name: true, code: true, status: true } } },
+        where: {
+          status: "ACTIVE" as const,
+          tenant: {
+            status: TenantStatus.ACTIVE,
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+        },
+        include: { tenant: { select: { id: true, name: true, code: true, status: true, expiresAt: true } } },
       },
     };
   }
 
   private async selectWorkspace(user: UserWithMemberships, requestedTenantId?: string) {
     const memberships = user.memberships.filter(
-      (membership) => membership.tenant.status === TenantStatus.ACTIVE,
+      (membership) => isTenantAvailable(membership.tenant),
     );
     const workspaces = memberships.map((membership) => ({
       id: membership.tenant.id,
