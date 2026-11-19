@@ -24,7 +24,7 @@ npm.cmd run dev
 确保本机 PostgreSQL 服务正在运行。在 PowerShell 中从仓库根目录运行初始化脚本；脚本会隐藏提示本机 PostgreSQL 数据库所有者密码，创建本地数据库 `jianjian`，并自动生成 Git 忽略的 `apps/api/.env`（含新的随机开发密钥），不会在终端输出密码：
 
 ```powershell
-.\apps\api\scripts\setup-local-postgres.ps1 -PsqlPath "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\apps\api\scripts\setup-local-postgres.ps1 -PsqlPath "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 ```
 
 将命令中的 `psql.exe` 路径改成本机安装路径。脚本默认账号为 `postgres`；如本机使用其他数据库所有者，可在提示时输入其账号。脚本拒绝覆盖已有 `.env` 或所有者不匹配的现有数据库。当前本地开发不要求 Redis、Docker 或对象存储；没有配置 S3 时，照片上传功能不可用。

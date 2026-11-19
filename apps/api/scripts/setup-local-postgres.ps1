@@ -84,7 +84,7 @@ try {
     $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     try {
       $random.GetBytes($bytes)
-      return [Convert]::ToHexString($bytes).ToLowerInvariant()
+      return [BitConverter]::ToString($bytes).Replace("-", "").ToLowerInvariant()
     } finally {
       $random.Dispose()
     }
