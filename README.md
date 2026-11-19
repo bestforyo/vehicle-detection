@@ -7,7 +7,7 @@
 - NestJS API，按机构租户隔离，包含微信身份/邀请登录、角色校验、模板版本、订单与检测修订、证据媒体、审核发布、报告分享和健康检查模块。
 - Prisma/PostgreSQL 数据模型及初始迁移；平台管理员通过一次性 bootstrap 脚本创建，不包含默认账号或默认密码。
 - 支持私有 S3 兼容对象存储；本地可用 Docker Compose 启动 PostgreSQL 和可选 MinIO。
-- API 有 Jest 单元测试与独立 TypeScript 构建。运行时数据/迁移目前尚未连接真实 PostgreSQL 执行验收。
+- API 有 Jest 单元测试与独立 TypeScript 构建；已在本机 PostgreSQL 18.7 上应用初始迁移，并验证 API readiness、Swagger 与未登录请求的 401 行为。这不等于生产环境验收或真实业务端到端验收。
 - 当前没有生产域名/TLS 反向代理、备份恢复验证、正式标准模板、微信小程序客户端或线上环境配置。
 
 ## 本地运行
