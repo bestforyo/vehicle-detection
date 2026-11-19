@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="row heading">
+    <view>
+      <text class="eyebrow">WORKSPACE · ORDERS</text>
+      <text class="title">检测订单</text>
+      <text class="muted">{{workspaceName}}</text>
+    </view>
+    <button class="small-action" bindtap="logout">退出</button>
+  </view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <button class="primary-button" bindtap="createOrder">＋ 创建检测订单</button>
+  <button class="secondary-button" bindtap="openTemplates">查看已发布模板</button>
+  <view wx:if="{{loading}}" class="empty">正在加载机构订单…</view>
+  <view wx:elif="{{!orders.length}}" class="card empty">
+    <text class="card-title">暂无检测订单</text>
+    <text class="muted">这里只展示服务端已保存、且当前账号有权访问的订单。</text>
+  </view>
+  <view wx:else>
+    <view wx:for="{{orders}}" wx:key="id" class="order-card" data-id="{{item.id}}" bindtap="openOrder">
+      <view class="row">
+        <text class="order-title">{{item.vehicle.brand || "车辆"}} {{item.vehicle.model || ""}}</text>
+        <text class="status">{{item.statusLabel}}</text>
+      </view>
+      <text class="order-subtitle">{{item.template.title}} · {{item.template.standardType}}</text>
+      <text class="small">{{item.orderNo}}　{{item.vehicle.plate || "未填写车牌"}}</text>
+      <text class="small">检测师：{{item.inspector.displayName}}</text>
+    </view>
+    <button wx:if="{{hasMore}}" class="secondary-button" loading="{{loadingMore}}" bindtap="loadMore">加载更早的订单</button>
+  </view>
+</view>

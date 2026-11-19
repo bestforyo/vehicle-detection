@@ -1,0 +1,22 @@
+.eyebrow {
+  color: #8ca09a;
+  display: block;
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+  margin: 16rpx 0 12rpx;
+}
+
+.intro {
+  display: block;
+  margin: 12rpx 0 22rpx;
+}
+
+.field-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.field-row .field {
+  flex: 1;
+  min-width: 0;
+}

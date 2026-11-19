@@ -14,11 +14,12 @@
     "useCompilerPlugins": false
   },
   "compileType": "miniprogram",
+  "miniprogramRoot": "apps/miniapp/",
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [],
     "include": []
   },
-  "appid": "touristappid",
+  "appid": "wx17203f85eb5bc06f",
   "editorSetting": {}
 }

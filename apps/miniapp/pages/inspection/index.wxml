@@ -1,0 +1,67 @@
+<view class="page">
+  <view class="row heading">
+    <view>
+      <text class="eyebrow">{{order.orderNo}} · 修订版 {{revision.revisionNumber}}</text>
+      <text class="title">{{order.vehicle.brand}} {{order.vehicle.model}}</text>
+      <text class="muted">{{order.template.title}} · {{order.template.standardType}}　{{order.vehicle.plate}}</text>
+    </view>
+    <text class="status">{{statusLabel}}</text>
+  </view>
+
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{notice}}" class="success">{{notice}}</view>
+  <view wx:if="{{order.latestReview && order.latestReview.decision === 'RETURNED'}}" class="review-note card">
+    <text class="review-title">审核退回意见</text>
+    <text class="muted">{{order.latestReview.comment}}</text>
+  </view>
+  <view wx:if="{{!editable}}" class="info card">
+    <text>此检测版本已提交或不可编辑。审核结果由机构管理员处理。</text>
+  </view>
+
+  <picker class="picker section-picker" mode="selector" range="{{sectionOptions}}" value="{{sectionIndex}}" bindchange="onSectionChange">
+    <view class="row"><text>{{activeSection.title || "检测模块"}}</text><text class="small">{{sectionIndex + 1}} / {{sections.length}}　切换</text></view>
+  </picker>
+  <text wx:if="{{activeSection.guidance}}" class="muted section-guidance">{{activeSection.guidance}}</text>
+
+  <view wx:for="{{displayItems}}" wx:key="key" class="item-card">
+    <view class="row item-heading">
+      <text class="item-title">{{item.title}}</text>
+      <text wx:if="{{item.required}}" class="required">必检</text>
+    </view>
+    <text wx:if="{{item.guidance}}" class="muted guidance">{{item.guidance}}</text>
+
+    <picker wx:if="{{item.options.length}}" mode="selector" range="{{item.options}}" value="{{item.resultIndex}}" data-key="{{item.key}}" disabled="{{!editable}}" bindchange="onResultChange">
+      <view class="picker result-picker">{{item.answer.value || "选择检测结果"}}</view>
+    </picker>
+    <input wx:else class="input" placeholder="填写检测结果" maxlength="500" value="{{item.answer.value}}" data-key="{{item.key}}" bindinput="onValueInput" disabled="{{!editable}}" />
+
+    <view wx:if="{{item.needsThreshold}}" class="field">
+      <text class="field-label">尺寸判定（必填）</text>
+      <picker mode="selector" range="{{thresholdLabels}}" value="{{item.thresholdIndex}}" data-key="{{item.key}}" disabled="{{!editable}}" bindchange="onThresholdChange">
+        <view class="picker">{{item.answer.thresholdFindingLabel || "选择尺寸判定"}}</view>
+      </picker>
+    </view>
+    <label wx:if="{{item.needsNote}}" class="field">
+      <text class="field-label">补充说明（必填）</text>
+      <textarea class="textarea" maxlength="2000" value="{{item.answer.note}}" data-key="{{item.key}}" bindinput="onNoteInput" disabled="{{!editable}}" placeholder="记录现场检查依据" />
+    </label>
+
+    <view class="evidence">
+      <view class="row"><text class="field-label">{{item.needsEvidence ? "该结果必须添加现场照片" : "现场照片"}}</text><text class="small">{{item.answer.evidenceAssetIds.length}} 张</text></view>
+      <view wx:if="{{item.answer.evidenceAssetIds.length}}" class="photo-list">
+        <view wx:for="{{item.answer.evidenceAssetIds}}" wx:for-item="assetId" wx:key="*this" class="photo-chip">已安全保存照片 {{index + 1}}</view>
+      </view>
+      <button wx:if="{{editable}}" class="secondary-button photo-button" data-key="{{item.key}}" bindtap="addPhoto">拍照或从相册选择</button>
+    </view>
+  </view>
+
+  <view class="row pager">
+    <button class="secondary-button" disabled="{{sectionIndex === 0}}" bindtap="previousSection">上一模块</button>
+    <text class="small">模块 {{sectionIndex + 1}} / {{sections.length}}</text>
+    <button class="secondary-button" disabled="{{sectionIndex >= sections.length - 1}}" bindtap="nextSection">下一模块</button>
+  </view>
+  <view wx:if="{{editable}}" class="save-bar">
+    <button class="secondary-button" loading="{{saving}}" bindtap="saveDraft">保存草稿</button>
+    <button class="primary-button" loading="{{saving}}" bindtap="submitInspection">提交审核</button>
+  </view>
+</view>

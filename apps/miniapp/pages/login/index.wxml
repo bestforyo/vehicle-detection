@@ -1,0 +1,26 @@
+<view class="page login-page">
+  <view class="brand-mark">鉴</view>
+  <text class="eyebrow">INSPECTION WORKSPACE</text>
+  <text class="title">鉴见检测工作台</text>
+  <text class="muted intro">使用已加入机构的微信账号登录，检测记录将安全保存至机构业务系统。</text>
+
+  <view wx:if="{{error}}" class="error" role="alert">{{error}}</view>
+
+  <view wx:if="{{invitationToken}}" class="card">
+    <text class="card-title">接受机构邀请</text>
+    <text class="muted">确认显示名称后，使用当前微信账号加入邀请机构。</text>
+    <input class="input" placeholder="检测师姓名" maxlength="80" value="{{displayName}}" bindinput="onNameInput" />
+    <button class="primary-button" loading="{{busy}}" bindtap="acceptInvitation">接受邀请并登录</button>
+  </view>
+
+  <view wx:else class="card">
+    <text wx:if="{{workspaces.length}}" class="field-label">选择机构工作空间</text>
+    <picker wx:if="{{workspaces.length}}" class="picker workspace-picker" mode="selector" range="{{workspaces}}" range-key="name" value="{{workspaceIndex}}" bindchange="onWorkspaceChange">
+      <view class="row"><text>{{selectedWorkspace.name || "请选择机构"}}</text><text class="small">切换</text></view>
+    </picker>
+    <button class="primary-button" loading="{{busy}}" disabled="{{workspaces.length && !selectedWorkspace.id}}" bindtap="login">
+      {{busy ? "正在安全登录…" : "使用微信登录"}}
+    </button>
+  </view>
+  <text class="footnote">仅已加入机构的账号可进入检测工作台。尚未加入机构？请联系机构管理员获取邀请。</text>
+</view>

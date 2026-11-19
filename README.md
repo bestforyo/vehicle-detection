@@ -9,7 +9,8 @@
 - 支持私有 S3 兼容对象存储；本地可用 Docker Compose 启动 PostgreSQL 和可选 MinIO。
 - API 有 Jest 单元测试与独立 TypeScript 构建；已在本机 PostgreSQL 18.7 上应用迁移，并验证 API readiness、Swagger 与未登录请求的 401 行为。这不等于生产环境验收或真实业务端到端验收。
 - 已加入机构成员/邀请/审计/资料管理及平台套餐、席位、月订单额度、到期与支持操作审计；正式标准需经平台单独录入来源/授权并审批，模板只能引用已审批标准。当前未导入任何标准或生产模板，等待用户提供权威文件与专业审核信息。
-- 检测师 Web 工作台位于 `/`，可使用机构密码账号登录，读取服务端已发布模板和订单，创建检测订单、保存版本化草稿、通过已配置的私有对象存储上传现场照片并提交审核。空机构不会自动植入演示模板；没有 S3 配置时照片上传由 API 明确拒绝。摩托车新建入口按规格保持关闭。旧版纯前端演示流程仅保留在 `/prototype`，不得用于真实业务。
+- 检测师 Web 工作台位于 `/`，可使用机构密码账号登录，读取服务端已发布模板和订单，创建检测订单、保存版本化草稿、通过已配置的私有对象存储上传现场照片并提交审核。空机构不会自动植入演示模板；没有 S3 配置时照片上传由 API 明确拒绝。摩托车新建入口按规格保持关闭。原型中预配置的国标/团标清单是后续服务端模板导入来源，不等同于已经完成平台标准来源、许可和专业审批；未发布的模板不会用于真实检测。旧版纯前端演示流程仅保留在 `/prototype`，不得用于真实业务。
+- 原生微信小程序项目位于 `apps/miniapp/`，项目 AppID 已配置，支持机构微信登录/邀请接受、订单/已发布模板查看、乘用车建单、按服务端模板检测、草稿保存、现场照片上传与提交审核。小程序 API 域名、服务器端微信 AppSecret、已备案并加入微信 request/uploadFile 域名白名单的 HTTPS 域名，以及正式 COS Bucket 和最小权限密钥仍需在部署环境配置；这些值不能写入小程序包或 Git。
 - 管理 Web 位于 `/admin`，可使用已有密码账号登录，提供平台机构/订阅/邀请/标准审批与机构资料/成员/订单/审核/分享/审计界面。登录令牌只在当前标签页内维护并通过刷新令牌续期；邀请接受仍需已配置的微信小程序。公开报告只读 H5 使用 `/r/:token`；模板编辑、小程序、生产照片存储配置和完整端到端验收尚未交付，不能视为完整客户端。
 - 当前没有生产域名/TLS 反向代理、备份恢复验证、正式标准模板、微信小程序客户端或线上环境配置。
 
@@ -41,6 +42,13 @@ npm.cmd run start:dev --workspace @jianjian/api
 以上脚本为单机开发便利而使用数据库所有者账号。请勿在生产环境使用 PostgreSQL 超级用户运行 API。
 
 健康检查：`http://localhost:3001/health/ready`。开发环境 Swagger：`http://localhost:3001/api/docs`。Web 通过 `npm.cmd run dev` 启动；检测工作台访问 `http://localhost:5173/`，管理端访问 `http://localhost:5173/admin`，仅演示原型访问 `http://localhost:5173/prototype`。默认 API 地址为 `http://127.0.0.1:3001/api/v1`，部署时通过 `VITE_API_BASE_URL` 指向 HTTPS API。报告分享 URL 应使用配置的 HTTPS `PUBLIC_REPORT_BASE_URL`，并将其路由到 `/r/:token`。
+
+### 微信开发者工具和腾讯 COS 配置
+
+1. 在微信开发者工具中打开仓库根目录，项目配置已指向 `apps/miniapp/` 并使用已提供的小程序 AppID。编辑 `apps/miniapp/config.js` 的 `apiBaseUrl` 指向开发或已部署 API 的 `/api/v1` 地址；真机预览/发布必须使用已备案 HTTPS 域名，并在小程序后台配置 request/uploadFile 合法域名。
+2. 将该 AppID 与对应的 **小程序 AppSecret** 配置到 API 主机的 `WECHAT_MINIAPP_APP_ID`、`WECHAT_MINIAPP_APP_SECRET` 环境变量；AppSecret 只存在服务器密钥存储中，不写入小程序代码、`.env.example` 或仓库。
+3. 先在腾讯云 COS 创建私有 Bucket。API 兼容配置使用 `S3_ENDPOINT=https://cos.<bucket-region>.myqcloud.com`、`S3_REGION=<bucket-region>`、`S3_FORCE_PATH_STYLE=true`；`S3_BUCKET` 填 COS Bucket 的完整名称（包含 COS 账号 APPID 后缀），并创建限制到该 Bucket 的最小权限 SecretId/SecretKey，分别设置到 `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`。**小程序 AppID 和 COS 账号 APPID 是不同标识**；50 GB 容量包本身不是 Bucket 或 API 凭证。用户提供的资源信息没有给出 Bucket 名、Bucket 区域、COS 账号 APPID 或密钥，因此尚不能实际连通验证。
+4. 小程序预览照片直接使用服务端签发的短效上传 URL 和 API `upload-intents` / `complete` 流程。确认 COS Bucket 私有访问、签名 PUT、HEAD/GET/DELETE、跨地域网络和生命周期策略均符合需要后，使用真实 Bucket 完成图片端到端验收。
 
 ### Compose 部署基础（不是完整生产发布）
 

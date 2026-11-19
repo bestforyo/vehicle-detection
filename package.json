@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "build:api": "npm run build --workspace @jianjian/api",
     "test:api": "npm run test --workspace @jianjian/api",
+    "validate:miniapp": "node apps/miniapp/scripts/validate.cjs",
     "db:generate": "npm run db:generate --workspace @jianjian/api",
     "db:migrate:dev": "npm run db:migrate:dev --workspace @jianjian/api",
     "db:migrate:deploy": "npm run db:migrate:deploy --workspace @jianjian/api"

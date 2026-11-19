@@ -1,0 +1,27 @@
+<view class="page">
+  <text class="eyebrow">NEW INSPECTION</text>
+  <text class="title">创建检测订单</text>
+  <text class="muted intro">使用机构已审核发布的检测模板。摩托车新建检测暂未开放。</text>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{success}}" class="success">{{success}}</view>
+  <view class="card">
+    <view class="field">
+      <text class="field-label">检测模板</text>
+      <picker class="picker" mode="selector" range="{{templates}}" range-key="label" value="{{templateIndex}}" bindchange="onTemplateChange">
+        <view class="row"><text>{{selectedTemplate.label || "选择已发布模板"}}</text><text class="small">选择</text></view>
+      </picker>
+    </view>
+    <view class="field-row">
+      <label class="field"><text class="field-label">车辆品牌</text><input class="input" maxlength="100" value="{{form.brand}}" data-key="brand" bindinput="onInput" /></label>
+      <label class="field"><text class="field-label">车型</text><input class="input" maxlength="120" value="{{form.model}}" data-key="model" bindinput="onInput" /></label>
+    </view>
+    <view class="field-row">
+      <label class="field"><text class="field-label">年份</text><input class="input" type="number" value="{{form.year}}" data-key="year" bindinput="onInput" /></label>
+      <label class="field"><text class="field-label">里程（公里）</text><input class="input" type="number" value="{{form.mileage}}" data-key="mileage" bindinput="onInput" /></label>
+    </view>
+    <label class="field"><text class="field-label">车牌号</text><input class="input" maxlength="20" value="{{form.plate}}" data-key="plate" bindinput="onInput" /></label>
+    <label class="field"><text class="field-label">车架号（VIN）</text><input class="input" maxlength="17" value="{{form.vin}}" data-key="vin" bindinput="onInput" /></label>
+    <text class="small">车牌号与 VIN 至少填写一项。敏感车辆标识由后端加密保存。</text>
+    <button class="primary-button" loading="{{busy}}" disabled="{{!selectedTemplate.id}}" bindtap="createOrder">创建并开始检测</button>
+  </view>
+</view>

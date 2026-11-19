@@ -1,0 +1,73 @@
+.heading {
+  align-items: flex-start;
+  margin: 14rpx 0 24rpx;
+}
+
+.heading .title,
+.heading .muted {
+  display: block;
+}
+
+.heading .muted {
+  margin-top: 8rpx;
+}
+
+.eyebrow {
+  color: #8ca09a;
+  display: block;
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+  margin-bottom: 12rpx;
+}
+
+.small-action {
+  background: transparent;
+  color: #71817a;
+  font-size: 24rpx;
+  margin: 0;
+  padding: 8rpx;
+}
+
+.order-card {
+  background: #fff;
+  border: 1rpx solid #e5ebe7;
+  border-radius: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin: 18rpx 0;
+  padding: 24rpx;
+}
+
+.order-title {
+  color: #2b3c38;
+  font-size: 30rpx;
+  font-weight: 650;
+}
+
+.order-subtitle {
+  color: #65756f;
+  font-size: 25rpx;
+}
+
+.status {
+  background: #edf3fa;
+  border-radius: 30rpx;
+  color: #53738d;
+  font-size: 21rpx;
+  padding: 8rpx 12rpx;
+}
+
+.empty {
+  color: #84928f;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.card-title {
+  color: #344a40;
+  display: block;
+  font-size: 30rpx;
+  font-weight: 650;
+  margin-bottom: 10rpx;
+}

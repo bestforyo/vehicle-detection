@@ -1,0 +1,50 @@
+.login-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.brand-mark {
+  align-items: center;
+  background: #dcedc1;
+  border-radius: 20rpx 8rpx 20rpx 8rpx;
+  color: #2f634f;
+  display: flex;
+  font-size: 38rpx;
+  font-weight: 700;
+  height: 88rpx;
+  justify-content: center;
+  margin-bottom: 32rpx;
+  width: 88rpx;
+}
+
+.eyebrow {
+  color: #8ca09a;
+  font-size: 20rpx;
+  letter-spacing: 3rpx;
+  margin-bottom: 14rpx;
+}
+
+.intro {
+  margin: 14rpx 0 24rpx;
+}
+
+.card-title {
+  color: #344a40;
+  display: block;
+  font-size: 30rpx;
+  font-weight: 650;
+  margin-bottom: 12rpx;
+}
+
+.workspace-picker {
+  margin: 16rpx 0;
+}
+
+.footnote {
+  color: #899692;
+  font-size: 22rpx;
+  line-height: 1.7;
+  padding: 16rpx 4rpx;
+}

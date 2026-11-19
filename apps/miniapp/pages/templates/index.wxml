@@ -1,0 +1,18 @@
+<view class="page">
+  <text class="eyebrow">APPROVED · PUBLISHED</text>
+  <text class="title">检测模板</text>
+  <text class="muted subtitle">只显示当前机构已审核并发布的模板版本。</text>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{loading}}" class="card muted">正在加载模板…</view>
+  <view wx:elif="{{!templates.length}}" class="card empty">
+    <text class="card-title">当前机构尚无可用模板</text>
+    <text class="muted">原型中的国标/团标清单会作为模板配置来源；完成标准来源登记及机构审核发布后，即可在此使用。</text>
+  </view>
+  <view wx:else wx:for="{{templates}}" wx:key="id" class="card template-card">
+    <text class="template-standard">{{item.standardType}} · 修订版 {{item.revisions[0].revisionNumber}}</text>
+    <text class="card-title">{{item.title}}</text>
+    <text class="muted">{{item.usageLabel}} · {{item.vehicleKindLabel}}</text>
+    <text class="small">{{item.itemCount}} 个检测项</text>
+    <button class="primary-button" data-index="{{index}}" bindtap="startOrder">使用此模板</button>
+  </view>
+</view>
