@@ -301,7 +301,7 @@ export class AuthService {
   }
 
   async currentUser(actor: AuthenticatedActor) {
-    return this.prisma.user.findUniqueOrThrow({
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: actor.userId },
       select: {
         id: true,
@@ -324,6 +324,16 @@ export class AuthService {
         },
       },
     });
+    return {
+      ...user,
+      activeWorkspace: actor.tenantId && actor.membershipId && actor.role
+        ? {
+          tenantId: actor.tenantId,
+          membershipId: actor.membershipId,
+          role: actor.role,
+        }
+        : null,
+    };
   }
 
   async switchWorkspace(actor: AuthenticatedActor, tenantId: string) {

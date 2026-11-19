@@ -537,7 +537,15 @@ export class OrdersService {
         inspector: { select: { id: true, user: { select: { displayName: true } } } },
         revisions: {
           orderBy: { revisionNumber: "desc" },
-          include: { answers: true, evidence: { include: { asset: { select: { id: true, mimeType: true, scanStatus: true, previewKey: true } } } } },
+          include: {
+            answers: true,
+            evidence: { include: { asset: { select: { id: true, mimeType: true, scanStatus: true, previewKey: true } } } },
+            reviews: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { decision: true, comment: true, targetKeys: true, createdAt: true },
+            },
+          },
         },
       },
     });
@@ -548,6 +556,9 @@ export class OrdersService {
   }
 
   private toOrderView(order: Awaited<ReturnType<OrdersService["findAccessibleOrder"]>>) {
+    const latestReview = order.revisions
+      .flatMap((revision) => revision.reviews)
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
     return {
       id: order.id,
       orderNo: order.orderNo,
@@ -571,6 +582,12 @@ export class OrdersService {
         approvalRef: order.templateRevision.approvalRef,
         standard: order.templateRevision.standardRevision,
       },
+      latestReview: latestReview ? {
+        decision: latestReview.decision,
+        comment: latestReview.comment,
+        targetKeys: latestReview.targetKeys,
+        createdAt: latestReview.createdAt,
+      } : null,
       revisions: order.revisions.map((revision) => ({
         id: revision.id,
         revisionNumber: revision.revisionNumber,

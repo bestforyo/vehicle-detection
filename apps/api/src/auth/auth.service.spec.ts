@@ -1,4 +1,4 @@
-import { MembershipRole, TenantStatus } from "@prisma/client";
+import { MembershipRole, PlatformRole, TenantStatus } from "@prisma/client";
 import { AuthService } from "./auth.service";
 
 describe("AuthService workspace selection", () => {
@@ -50,5 +50,64 @@ describe("AuthService workspace selection", () => {
     await expect(
       Reflect.get(service, "selectWorkspace")(user, "other-tenant"),
     ).rejects.toThrow("当前账号未加入所选机构。");
+  });
+
+  it("returns the current tenant workspace and membership for client authorization", async () => {
+    const currentUser = {
+      id: user.id,
+      displayName: "检测师",
+      email: null,
+      platformRole: "NONE",
+      memberships: [membership],
+    };
+    const service = new AuthService(
+      { user: { findUniqueOrThrow: jest.fn().mockResolvedValue(currentUser) } } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.currentUser({
+      userId: user.id,
+      sessionId: "session-1",
+      tenantId: tenant.id,
+      membershipId: membership.id,
+      role: membership.role,
+      platformRole: PlatformRole.NONE,
+    })).resolves.toMatchObject({
+      activeWorkspace: {
+        tenantId: tenant.id,
+        membershipId: membership.id,
+        role: membership.role,
+      },
+    });
+  });
+
+  it("reports a null active workspace for platform sessions", async () => {
+    const service = new AuthService(
+      {
+        user: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            id: "platform-user",
+            displayName: "平台运营",
+            email: "ops@example.test",
+            platformRole: "OPERATOR",
+            memberships: [],
+          }),
+        },
+      } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.currentUser({
+      userId: "platform-user",
+      sessionId: "session-2",
+      tenantId: null,
+      membershipId: null,
+      role: null,
+      platformRole: PlatformRole.OPERATOR,
+    })).resolves.toMatchObject({ activeWorkspace: null });
   });
 });

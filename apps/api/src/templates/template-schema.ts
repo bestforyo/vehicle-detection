@@ -24,6 +24,15 @@ export const inspectionTemplateSchema = z.object({
 }).superRefine((schema, context) => {
   const sectionKeys = new Set<string>();
   const itemKeys = new Set<string>();
+  const totalItemCount = schema.sections.reduce((total, section) => total + section.items.length, 0);
+  if (totalItemCount > 500) {
+    context.addIssue({
+      code: "custom",
+      path: ["sections"],
+      message: "单个检测模板的检测项总数不能超过 500 项。",
+    });
+  }
+
   schema.sections.forEach((section, sectionIndex) => {
     if (sectionKeys.has(section.key)) {
       context.addIssue({

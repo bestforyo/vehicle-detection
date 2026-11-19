@@ -2,6 +2,7 @@ export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:
 const REFRESH_KEY = "jianjian-admin-refresh";
 
 let accessToken: string | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
 
 export type Workspace = {
   id: string;
@@ -15,6 +16,11 @@ export type CurrentUser = {
   displayName: string;
   email: string | null;
   platformRole: "NONE" | "OPERATOR" | "SUPER_ADMIN";
+  activeWorkspace: {
+    tenantId: string;
+    membershipId: string;
+    role: "INSPECTOR" | "ORG_ADMIN";
+  } | null;
   memberships: Array<{
     id: string;
     role: "INSPECTOR" | "ORG_ADMIN";
@@ -30,23 +36,29 @@ export type SignInResult = {
   workspaces?: Workspace[];
 };
 
-async function refreshAccessToken(): Promise<boolean> {
+function refreshAccessToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
   const refreshToken = sessionStorage.getItem(REFRESH_KEY);
-  if (!refreshToken) return false;
-  const response = await fetch(`${API_BASE}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
+  if (!refreshToken) return Promise.resolve(false);
+  refreshInFlight = (async () => {
+    const response = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!response.ok) {
+      sessionStorage.removeItem(REFRESH_KEY);
+      accessToken = null;
+      return false;
+    }
+    const tokens = await response.json() as { accessToken: string; refreshToken: string };
+    accessToken = tokens.accessToken;
+    sessionStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+    return true;
+  })().finally(() => {
+    refreshInFlight = null;
   });
-  if (!response.ok) {
-    sessionStorage.removeItem(REFRESH_KEY);
-    accessToken = null;
-    return false;
-  }
-  const tokens = await response.json() as { accessToken: string; refreshToken: string };
-  accessToken = tokens.accessToken;
-  sessionStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-  return true;
+  return refreshInFlight;
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
